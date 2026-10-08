@@ -1,0 +1,25 @@
+# Secrets
+.env
+*.env
+.env.local
+
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Node / build output
+node_modules/
+src/frontend/build/
+dist/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+# AI assistant local files
+.claude/
+CLAUDE.md
+CLAUDE.local.md
