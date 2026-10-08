@@ -56,10 +56,10 @@ Sample Query and Response
 cd AIport
 
 # 2. Setup database
-mysql -u root -p < database/data/AIplane.sql
+mysql -u root -p < src/database/data/AIplane.sql
 
 # 3. Configure backend
-cd backend
+cd src/backend
 cp .env.example .env
 # Edit .env: add CLAUDE_API_KEY and DATABASE_PASSWORD
        .env: add MODAL_API_KEY for fine-tuned LLM
@@ -67,43 +67,47 @@ cp .env.example .env
 # 4. Install dependencies
 pip install -r requirements.txt
 cd ../frontend && npm install
-cd ../ && npm install
+cd ../.. && npm install
 
 # 5. Run application
 # Terminal 1: Start backend
-cd backend && python app.py
+cd src/backend && python app.py
 
 # Terminal 2: Start desktop app
 npm run dev
 ```
 
 See [QUICK_START.md](QUICK_START.md) for detailed instructions.
+A tested, step-by-step setup is in [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
 
 ## Project Structure
 
 ```
 AIport/
-├── electron/
-│   └── main.js              # Electron main process
-├── backend/
-│   ├── app.py               # Flask API server
-│   ├── requirements.txt     # Python dependencies
-│   └── .env.example         # Environment template
-├── frontend/
-│   ├── src/
-│   │   ├── api/             # API client
-│   │   ├── components/      # React components
-│   │   └── App.tsx          # Main component
-│   └── package.json
-├── database/
-│   ├── data/
-│   │   ├── AIplane.sql      # Database dump
-│   │   └── field_mapping.xlsx
-│   └── scripts/
-│       ├── db_manager.py    # Database CLI tool
-│       └── config.py        # Database configuration
+├── docs/                        # Project Plan, setup & developer guides
+├── src/
+│   ├── electron/
+│   │   └── main.js              # Electron main process
+│   ├── backend/
+│   │   ├── app.py               # Flask API server
+│   │   ├── requirements.txt     # Python dependencies
+│   │   └── .env.example         # Environment template
+│   ├── frontend/
+│   │   ├── src/
+│   │   │   ├── api/             # API client
+│   │   │   ├── components/      # React components
+│   │   │   └── App.tsx          # Main component
+│   │   └── package.json
+│   └── database/
+│       ├── data/
+│       │   ├── AIplane.sql      # Database dump
+│       │   └── field_mapping.xlsx
+│       └── scripts/
+│           ├── db_manager.py    # Database CLI tool
+│           └── config.py        # Database configuration
 ├── package.json             # Electron configuration
 ├── QUICK_START.md
+├── AI_USE.md                # How AI tools were used
 └── README.md
 ```
 

@@ -43,7 +43,7 @@ echo "==========================================================================
 echo "🔧 Setting up Backend"
 echo "=========================================================================="
 
-cd backend
+cd src/backend
 
 # Create virtual environment
 echo ""
@@ -67,7 +67,7 @@ if [ ! -f .env ]; then
     echo ""
     echo "📝 Creating .env file from template..."
     cp .env.example .env
-    echo "⚠️  IMPORTANT: Edit backend/.env and add your API keys!"
+    echo "⚠️  IMPORTANT: Edit src/backend/.env and add your API keys!"
     echo "   - GEMINI_API_KEY (get from: https://aistudio.google.com/app/apikey)"
     echo "   - DB_PASSWORD (your MySQL password)"
 fi
@@ -79,7 +79,7 @@ echo "==========================================================================
 echo ""
 echo "📋 Next steps:"
 echo ""
-echo "1. Edit backend/.env and add your credentials:"
+echo "1. Edit src/backend/.env and add your credentials:"
 echo "   - GEMINI_API_KEY"
 echo "   - DB_PASSWORD"
 echo ""
@@ -87,10 +87,10 @@ echo "2. Setup MySQL database:"
 echo "   mysql -u root -p"
 echo "   CREATE DATABASE aiplane;"
 echo "   exit"
-echo "   mysql -u root -p aiplane < database/AIplane.sql"
+echo "   mysql -u root -p aiplane < src/database/data/AIplane.sql"
 echo ""
 echo "3. Start the backend:"
-echo "   cd backend"
+echo "   cd src/backend"
 echo "   source venv/bin/activate"
 echo "   python app.py"
 echo ""

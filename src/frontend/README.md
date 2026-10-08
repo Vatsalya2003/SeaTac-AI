@@ -154,4 +154,4 @@ npm install
 
 ## License
 
-MIT License - See root [README.md](../README.md)
+MIT License - See root [README.md](../../README.md)
