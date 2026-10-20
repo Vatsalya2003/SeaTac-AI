@@ -23,3 +23,16 @@ dist/
 .claude/
 CLAUDE.md
 CLAUDE.local.md
+
+# Port of Seattle data files (never commit)
+*Anonymized*.xlsx
+*Anonymized*.csv
+src/database/data/private/
+
+# Dumps of the new Port data (never commit). AIplane.sql is tracked and unaffected.
+/seatac*.sql
+/AIplane_v2*.sql
+src/database/data/seatac*.sql
+src/database/data/AIplane_v2*.sql
+*_dump*.sql
+*.sql.gz
