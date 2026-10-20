@@ -13,7 +13,7 @@ from pathlib import Path
 DB_CONFIG = {
     'host': os.getenv('DB_HOST', 'localhost'),
     'user': os.getenv('DB_USER', 'root'),
-    'password': os.getenv('DB_PASSWORD', 'oyrq1206'),  # Set via environment variable
+    'password': os.getenv('DB_PASSWORD', ''),  # Set via environment variable
     'database': os.getenv('DB_NAME', 'AIplane'),
     'charset': 'utf8mb4',
     'port': int(os.getenv('DB_PORT', 3306))
