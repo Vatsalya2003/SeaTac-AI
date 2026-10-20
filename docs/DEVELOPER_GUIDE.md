@@ -269,7 +269,7 @@ Status comes from reading the code and checking data facts, **not from running t
 - Fine-tuned CodeLlama path: kept but disabled (`USE_MODAL = False`, a stub class at `app_optimized.py:479`).
 - The Claude SQL checker (`ClaudeSQLValidator`) and the rule-based checker (`SQLValidator`) exist in `app_optimized.py` and are created at startup (`:1765`) but **never called**.
 - The ramp events (schema only, no data).
-- Real authentication, user testing with Port operations staff, real-time data (all on the roadmap in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md#6-where-we-team-3-pick-up)).
+- Real authentication, user testing with Port operations staff, real-time data (all on the roadmap in [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md#6-where-we-team-2-pick-up)).
 
 ### 🗑️ Dead code (safe to delete once confirmed)
 
@@ -389,7 +389,7 @@ Ordered by severity within each group. **(Verified)** means we reproduced it by 
 
 ## 7. Open questions (for the team, client or Team 6)
 
-1. **Which backend do we keep?** `app_optimized.py`, `app.py`, or a merge of the two? And which LLM, at what budget? (See [PROJECT_SUMMARY.md §6](PROJECT_SUMMARY.md#6-where-we-team-3-pick-up).)
+1. **Which backend do we keep?** `app_optimized.py`, `app.py`, or a merge of the two? And which LLM, at what budget? (See [PROJECT_SUMMARY.md §6](PROJECT_SUMMARY.md#6-where-we-team-2-pick-up).)
 2. **Is the Railway deployment still live, and who owns it?** Where is its MySQL hosted, and which `CLAUDE_MODEL` does it use? (Ask Abhishek.)
 3. **Where did the 91% accuracy figure come from?** Is there a test set outside the repo?
 4. **Which spreadsheet did Jo import with the ramp changes, and why isn't the regenerated data committed?**

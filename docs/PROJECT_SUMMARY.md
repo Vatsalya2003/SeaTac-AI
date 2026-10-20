@@ -48,7 +48,7 @@ Later generations added an 11th type, **taxi-time breakdown** (taxi-in vs taxi-o
 |---|---|---|
 | Sep–Dec 2025 | **Fall 2025 team "AIport"**: Aurora Ouyang, Anqi Yu, Dora Ren, Yuwei Ma, Xiaoya Wang | Built the first working system: Electron + React + Flask + Gemini + MySQL. Final presentation Dec 4, 2025 |
 | Jan–May 2026 | **Spring 2026 "Team 6"**: Abhishek Ghaisas, Nishant Kumar, Ishan Chaudhary, Zhiqi "Jo" Zhang | Rewrote the backend in FastAPI and experimented with LLMs (Gemini → fine-tuned CodeLlama plus a validator → Claude). Added login and CSV export, and deployed to Railway. Last commit May 7, 2026 |
-| Fall 2026 | **Us (Team 3)** | Forked Abhishek's repo into [`github.com/Vatsalya2003/SeaTac-AI`](https://github.com/Vatsalya2003/SeaTac-AI). **No changes made yet** (see §6) |
+| Fall 2026 | **Us (Team 2)** | Forked Abhishek's repo into [`github.com/Vatsalya2003/SeaTac-AI`](https://github.com/Vatsalya2003/SeaTac-AI). **No changes made yet** (see §6) |
 
 ---
 
@@ -123,7 +123,7 @@ Sources: the mid-term deck `OLD Data/Port-of-Seattle-SEA-Airfield-Data-Intellige
 
 ### The state Team 6 left it in (May 2026)
 
-- **Deployed:** the backend (`app_optimized.py`) runs on Railway, and the frontend probably does too. The README links to it with a shared demo login. ⚠️ Not verified that it's still live.
+- **Deployed:** the backend (`app_optimized.py`) ran on Railway, and the frontend probably did too. The README linked to it with a shared demo login. **Checked on 2026-10-08: the deployment is gone** (the app URL returns 404 "Application not found").
 - **Pipeline in use:** the question goes to Claude, which writes SQL. The SQL gets an automatic fix for common event-name mistakes, a time filter is added, the query runs on MySQL, and Claude writes a 2–3 sentence "insight". Walkthrough in [DEVELOPER_GUIDE.md → How a query flows](DEVELOPER_GUIDE.md#3-how-a-question-flows-through-the-system-end-to-end).
 - **Kept but switched off:** the CodeLlama fine-tune (`modal_finetune.py`, `modal_serve.py`), the training data (507 examples) and the Claude validator.
 - **Claimed:** 91% accuracy ([`README.md`](../README.md)). Commit `37563d8` (Apr 26) changed the README figure from 78% to 91% with the message "Updated performance metrics". ⚠️ The repo has no test set, evaluation script or results, so we can't reproduce it. It's also unclear which pipeline was measured (CodeLlama + Claude, or Claude alone).
@@ -131,7 +131,7 @@ Sources: the mid-term deck `OLD Data/Port-of-Seattle-SEA-Airfield-Data-Intellige
 
 ---
 
-## 6. Where we (Team 3) pick up
+## 6. Where we (Team 2) pick up
 
 **What changed since we forked:** nothing. `git status` is clean, and the last commit (`111fd5a`, May 7, 2026) is Abhishek's. The only difference is the remote (`origin` now points to `Vatsalya2003/SeaTac-AI`).
 
