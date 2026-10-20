@@ -17,7 +17,8 @@ These are the versions installed and running on our machine, including our uncom
 |---|---|---|
 | Frontend | React + TypeScript + Vite, Chart.js, react-markdown | React 18.3.1 · TypeScript 5.9.3 · Vite 6.4.3 · Chart.js 4.5.1 · react-markdown 10.1.0 · Node 22 |
 | Backend | Python + FastAPI + Uvicorn + Pydantic | Python 3.12 · FastAPI 0.109.0 · Uvicorn 0.27.0 · Pydantic 2.13.5 |
-| Database | MySQL (driver: mysql-connector-python) | MySQL 8.4.8 · connector 8.2.0 |
+| Database | MySQL (driver: mysql-connector-python). Chatbot → `AIplane`; new Port data → `seatac` | MySQL 8.4.8 · connector 8.2.0 |
+| Data loading | `src/database` scripts: pandas + openpyxl (read the export), PyMySQL (write), python-dotenv, PyYAML | pandas 3.0.6 · openpyxl 3.1.5 · PyMySQL 1.2.3 · python-dotenv 1.2.4 · PyYAML 6.0.3 (Python 3.12, own venv) |
 | AI, active | **Google Gemini** via `google-genai` (`LLM_PROVIDER=gemini`) | `gemini-2.5-flash` · google-genai 2.27 |
 | AI, available | Anthropic Claude via `anthropic` (set `LLM_PROVIDER=claude`; needs API credit) | `claude-sonnet-4-20250514` (deprecated model; see §4) · anthropic 0.125.0 |
 | AI, off | Fine-tuned CodeLlama-7B on Modal | not used |
@@ -83,8 +84,8 @@ From [`backend/requirements.txt`](../src/backend/requirements.txt):
 | **python-dotenv** | `1.0.0` | Loads `backend/.env` | — |
 | **requests** / **httpx** | `2.31.0` / `>=0.25.0` | `requests` calls the Modal endpoint (code switched off). `httpx` is needed by the anthropic SDK | Commit `57d0f1a`: "Updated anthropic and httpx package versions". ❓ No reason stated |
 
-**Used in the repo but NOT in `requirements.txt`** (install them separately if you need these scripts):
-- `pandas`, `openpyxl`, `pymysql`: used by [`database/scripts/db_manager.py`](../src/database/scripts/db_manager.py) (see [`database/INSTALL.md`](../src/database/INSTALL.md)).
+**Used in the repo but NOT in `backend/requirements.txt`:**
+- `pandas`, `openpyxl`, `pymysql`: used by the database scripts. They're now declared in their own [`src/database/requirements.txt`](../src/database/requirements.txt) (see §3b).
 - `modal`, `groq`, `jsonlines`: used by the fine-tuning and training-data scripts. They were in the Mar 11 `requirements.txt` (commit `ffcd4e8`) and later dropped.
 
 **Removed since the Spring 2026 mid-term:** LangChain (`langchain==1.2.10`) and Google Gemini (`google-genai`, `langchain-google-genai`) were in the first FastAPI version (commit `ffcd4e8`, Mar 11) and are gone now. Dropping LangChain agents is explained: "Due to Langchain v1.2.10 compatibility issues, current approach is manual orchestration" (mid-term p.6, p.8).
@@ -95,8 +96,20 @@ From [`backend/requirements.txt`](../src/backend/requirements.txt):
 
 | Technology | Version | What for | Why chosen |
 |---|---|---|---|
-| **MySQL** | 8.0+ required; the dump came from **9.5.0** | Stores the 3 tables; see [DB_SCHEMA.md](DB_SCHEMA.md) | ❓ No documented reason found. The Fall 2025 deck just says "we used MySQL" (slide 8 notes), and the Fall 2025 architecture diagram (`technicalarch.drawio` (team's `OLD Data/technical/technicalarch.drawio`; not in this repo)) lists it without a reason. The final deck claims the design "supports any standard SQL database" (slide 11 notes); ⚠️ the SQL is MySQL-specific (`TIMESTAMPDIFF`, `HOUR()`), so that's optimistic |
+| **MySQL** | 8.0+ required; the dump came from **9.5.0**. The `seatac` views need 8.0+ (window functions and recursive CTEs) | Two databases: **`AIplane`**, Team 6's 3 tables, which the chatbot uses ([legacy/DB_SCHEMA_TEAM6.md](legacy/DB_SCHEMA_TEAM6.md)), and **`seatac`**, the Port's updated export with metric views ([DB_SCHEMA.md](DB_SCHEMA.md)). Optional `AIplane_v2` = the new data in the old layout | ❓ No documented reason found. The Fall 2025 deck just says "we used MySQL" (slide 8 notes), and the Fall 2025 architecture diagram (`technicalarch.drawio` (team's `OLD Data/technical/technicalarch.drawio`; not in this repo)) lists it without a reason. The final deck claims the design "supports any standard SQL database" (slide 11 notes); ⚠️ the SQL is MySQL-specific (`TIMESTAMPDIFF`, `HOUR()`), so that's optimistic |
 | **Hosted database for Railway** | ⚠️ Unknown | The deployed backend reads `DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT` from the environment | Where the production database lives isn't recorded anywhere in the repo. Ask Team 6 (Abhishek) |
+
+### 3b. Data loading (`src/database/`)
+
+From [`src/database/requirements.txt`](../src/database/requirements.txt). Use a separate venv in `src/database/` (see [SETUP_GUIDE.md](SETUP_GUIDE.md#step-6-optional-load-the-ports-new-data-seatac)).
+
+| Library | Version (pin / installed) | Used by | What for | Why chosen |
+|---|---|---|---|---|
+| **pandas** | `>=2.2,<4` / 3.0.6 | `load_aerobahn.py`, `build_aiplane_v2.py`, `db_manager.py` | Read the 585-column Excel export, group aircraft types | Team 3 (Oct 2026): already used by Team 6's `db_manager.py`, so one toolset for both loaders |
+| **openpyxl** | `>=3.1,<4` / 3.1.5 | (pandas' Excel engine) | Reads `.xlsx`; datetimes and h:mm:ss durations come through as Python types | Required by pandas for `.xlsx` |
+| **PyMySQL** | `>=1.1,<2` / 1.2.3 | all database scripts | Create the `seatac` / `AIplane_v2` databases and bulk-insert rows | Pure Python, already used by `db_manager.py`. The backend's `mysql-connector-python` is left untouched |
+| **python-dotenv** | `>=1.0,<2` / 1.2.4 | `load_aerobahn.py` | Read `DB_*` settings from `src/backend/.env`, so there's one place for credentials | Same library the backend uses |
+| **PyYAML** | `>=6.0,<7` / 6.0.3 | `check_seatac.py` | Validate `metric_rules.yaml` against the views in the database | Standard YAML parser |
 
 ---
 
@@ -145,7 +158,7 @@ From [`backend/requirements.txt`](../src/backend/requirements.txt):
 1. **Only 11 distinct answers.** The 507 examples contain only **11 distinct SQL answers**, one per use case. The model learned "which of 11 templates does this question mean?", not general SQL writing, so it will probably do poorly on anything else.
 2. **Several of the "correct answers" are wrong** (the `USE_CASES` dict in `generate_training_data.py`):
    - **Use case 4 (runway occupancy) returns hard-coded numbers.** It reports `1.5` minutes for takeoffs and `1.2` for landings instead of calculating anything from the data.
-   - **Use cases 9 (runway utilisation) and 10 (peak hour) fall into the location trap.** They count every `Actual_Take_Off`/`Actual_Landing` by location with no operation filter, so events at other airports are counted on SEA runways ([DB_SCHEMA.md issue 3](DB_SCHEMA.md#known-schema-issues)). Use case 10 does no prediction.
+   - **Use cases 9 (runway utilisation) and 10 (peak hour) fall into the location trap.** They count every `Actual_Take_Off`/`Actual_Landing` by location with no operation filter, so events at other airports are counted on SEA runways ([Team 6 schema issue 3](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues)). Use case 10 does no prediction.
    - **Use cases 5, 6 and 11 join on `call_sign` without matching `operation`.** That mixes in the other leg's events, e.g. taxi-in at the destination airport for departures.
    - **Use case 7 (taxiway) only counts departures.** Arrivals' taxiway events are `Movement_Area_Exit`, which it leaves out.
    - **Use case 3 (movement area) counts distinct flights per hour**, which isn't true occupancy (how many aircraft are on the taxiways at the same moment).

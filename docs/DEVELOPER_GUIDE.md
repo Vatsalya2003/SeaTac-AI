@@ -23,6 +23,9 @@ SeaTac-AI/
 ├── LICENSE                            Apache 2.0 (the README says MIT; see §6)
 ├── AI_USE.md                          How the team used AI tools (course rubric)
 ├── docs/                              Project Plan PDF, these guides, QUERY_EXAMPLES.md (from Fall 2025)
+│   ├── DB_SCHEMA.md                   ★ New `seatac` database: tables, columns, views, checks
+│   ├── DATA_CHANGES.md                Old sample vs the Port's updated export
+│   └── legacy/DB_SCHEMA_TEAM6.md      Team 6's `AIplane` schema (still used by the chatbot)
 └── src/
     ├── backend/
     │   ├── app_optimized.py           ★ LIVE server (v8.0): Claude writes the SQL directly
@@ -36,11 +39,17 @@ SeaTac-AI/
     │   ├── generate_training_data.py  Makes the training data with Groq
     │   └── seatac_*training*.json(l)  507 training examples (4 formats)
     ├── database/
-    │   ├── data/AIplane.sql           ★ Schema + data. Import this
-    │   ├── data/field_mapping.xlsx    The Excel export the data came from
-    │   ├── scripts/db_manager.py      Excel → MySQL import tool (currently broken; see §2.5)
+    │   ├── data/AIplane.sql           Team 6's schema + data (old sample). The chatbot still uses this
+    │   ├── data/field_mapping.xlsx    The Excel extract the old data came from
+    │   ├── scripts/load_aerobahn.py   ★ Loads the Port's new export into the `seatac` database (rerunnable)
+    │   ├── scripts/check_seatac.py    Verifies `seatac`: counts, keys, exclusions, old vs new (no averages)
+    │   ├── scripts/build_aiplane_v2.py  New data in Team 6's old layout (`AIplane_v2`), for a fair baseline
+    │   ├── sql/seatac_views.sql       ★ The metric views (Samer's definitions)
+    │   ├── metric_rules.yaml          ★ Metric definitions, groupings, limits; Q1–Q10 → metric
+    │   ├── requirements.txt           Packages for the database scripts
+    │   ├── scripts/db_manager.py      Old Excel → MySQL import tool (currently broken; see §2.5)
     │   ├── scripts/config.py          DB settings for db_manager
-    │   └── README.md, INSTALL.md      DB docs (partly out of date)
+    │   └── README.md, INSTALL.md      Old DB docs (describe `AIplane`)
     ├── frontend/
     │   ├── src/App.tsx                ★ Main UI: login, chat threads, sending questions
     │   ├── src/api/query.ts           ★ The only place that calls the backend
@@ -128,6 +137,8 @@ Handy URLs while the backend runs:
 
 ### 2.5 Rebuilding the database from Excel (and why it currently fails)
 
+> This section is about Team 6's **old** `AIplane` import. For the Port's new export, use `load_aerobahn.py` ([§2.7](#27-the-ports-new-data-the-seatac-database)).
+
 You normally don't need this; just import `AIplane.sql`. But if you change the import logic:
 
 ```bash
@@ -152,9 +163,40 @@ This is only relevant if the team decides to revive it:
 
 ⚠️ This hasn't been run since March 2026. The docstrings still say `modal_codellama_finetune.py`, which is an old filename. Read [TECH_STACK.md → training data](TECH_STACK.md#training-data) for its limits.
 
+### 2.7 The Port's new data: the `seatac` database
+
+The Port's updated export (`August_8_and_9_2025_Anonymized.xlsx`, 1,061 legs) is **private and not in the repo**. Get it from the team privately (see [SETUP_GUIDE.md](SETUP_GUIDE.md#step-6-optional-load-the-ports-new-data-seatac)).
+
+```bash
+cd src/database
+python3.12 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cd scripts
+python load_aerobahn.py --file /path/to/August_8_and_9_2025_Anonymized.xlsx   # or set SEATAC_DATA_FILE
+python check_seatac.py                                                         # counts, keys, exclusions (no averages)
+python build_aiplane_v2.py --file /path/to/...xlsx                             # optional: old-layout baseline DB
+```
+
+- **Rerunnable:** each script drops and rebuilds only its own database (`seatac` / `AIplane_v2`), and both refuse to touch `AIplane`. They read `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` from the environment or from `src/backend/.env`.
+- **What gets built:** `raw_flight_details` (every non-empty column), `flights` (SEA-side times only), `aircraft_types`, and the metric views. Full reference: [DB_SCHEMA.md](DB_SCHEMA.md). What changed from the old data: [DATA_CHANGES.md](DATA_CHANGES.md).
+- **Never commit** the Excel file or a dump of `seatac` / `AIplane_v2` (real tail numbers and transponder codes). `.gitignore` blocks the usual file names; check `git status` before committing anyway.
+
 ---
 
 ## 3. How a question flows through the system, end to end
+
+### The data layer (new) — not wired to the chatbot yet
+
+```
+ Port export (.xlsx, private) ──load_aerobahn.py──► MySQL `seatac`
+                                                       raw_flight_details → flights + aircraft_types → metric views
+                                                                                                      (rules: metric_rules.yaml)
+ Chatbot (below) ─────────────────────────────────► MySQL `AIplane`  (Team 6's old sample, unchanged)
+```
+
+⚠️ **The chatbot still queries Team 6's `AIplane` database.** The new `seatac` views are built and verified, but `app_optimized.py` doesn't use them yet. Switching means pointing `DB_NAME` at `seatac` *and* rewriting the prompt/SQL step to use the views and `metric_rules.yaml`, since the table names differ. `AIplane_v2` (the new data in the old layout) exists so the unchanged chatbot can be tested on the new data as a baseline.
+
+### The chatbot path
 
 This traces the **live** path (`app_optimized.py`). Line numbers are for commit `111fd5a`.
 
@@ -203,15 +245,15 @@ Status comes from reading the code and checking data facts, **not from running t
 - Charts can switch between bar, line and pie; download as PNG (chart only, high-res, or with the summary text); and copy to the clipboard.
 - Tables can be searched, sorted and paged, and exported to CSV.
 - The whole question → Claude SQL → MySQL → Claude summary pipeline, for questions Claude can express using the event names it's told about.
-- Taxi-in by aircraft type (Q1) and taxi-out by hour (Q2). These have prompt examples *and* fallback templates, and the data supports them (see [DB_SCHEMA.md → Data quality](DB_SCHEMA.md#data-quality-facts)).
+- Taxi-in by aircraft type (Q1) and taxi-out by hour (Q2). These have prompt examples *and* fallback templates, and the data supports them (see [Team 6 schema → Data quality](legacy/DB_SCHEMA_TEAM6.md#data-quality-facts)).
 - Health endpoint, the auto-generated `/docs`, and the Railway deployment config.
 - The database dump imports cleanly on MySQL 8+ (by inspection; counts verified by parsing).
 
 ### ⚠️ Works but gives wrong or unreliable answers
 
 - **Questions whose event names aren't in the prompt:** Q3 movement-area occupancy, Q4 runway occupancy, Q7 taxiway use, Q9 runway use. `DETAILED_SCHEMA` only lists 4 event types and 6 `flight` columns, so Claude has to guess names like `Runway_Entrance`.
-- **Q4 runway occupancy** can't be answered with the obvious formula ([DB_SCHEMA.md issue 4](DB_SCHEMA.md#known-schema-issues)).
-- **Q9 runway use** and anything that counts events by location: roughly double counts ([DB_SCHEMA.md issue 3](DB_SCHEMA.md#known-schema-issues)).
+- **Q4 runway occupancy** can't be answered with the obvious formula ([Team 6 schema issue 4](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues)). ✅ **Resolved in the new `seatac` data**: `v_runway_occupancy` uses Samer's per-operation definition (not used by the chatbot yet).
+- **Q9 runway use** and anything that counts events by location: roughly double counts ([Team 6 schema issue 3](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues)). ✅ **Resolved in the new `seatac` data**: `v_runway_activity` has exactly one SEA take-off or landing per leg (not used by the chatbot yet).
 - **Q10 peak-hour prediction:** there is no prediction logic; the most Claude can do is summarise historical counts from one day of data.
 - **Any question** with a stray number, or starting with "Can you…" or "Explain…" (§6 C1, C2).
 - **The 91% accuracy claim** in the README can't be reproduced: there's no test set or evaluation script.
@@ -295,12 +337,14 @@ Ordered by severity within each group. **(Verified)** means we reproduced it by 
   - The result: *"Can you show taxi-in times by aircraft type?"* gets a friendly chat reply and no data.
 
 #### C3. The prompt tells Claude too little about the schema (HIGH)
+- ✅ **Partly resolved in the new `seatac` data**: the traps it doesn't explain (duplicate call signs, location tagging, runway-event structure) don't exist in `seatac`, and the metric definitions now live in `metric_rules.yaml`. The prompt itself is unchanged until the chatbot is switched.
 - `DETAILED_SCHEMA` lists 6 of 15 `flight` columns and only 4 of 18 event types.
-- It says nothing about duplicate call signs, the location trap, or runway-event structure ([DB_SCHEMA.md issues 1, 3, 4](DB_SCHEMA.md#known-schema-issues)).
+- It says nothing about duplicate call signs, the location trap, or runway-event structure ([Team 6 schema issues 1, 3, 4](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues)).
 - This probably explains most failures on Q3/Q4/Q7/Q9.
 
 #### C4. Joins on call sign multiply rows for 10 flights (MEDIUM, Verified)
-- See [DB_SCHEMA.md issue 1](DB_SCHEMA.md#known-schema-issues). Both fallback templates and the prompt's example join only on `call_sign` (the operation is filtered on each side, but duplicates remain).
+- ✅ **Resolved in the new `seatac` data**: every leg has a unique key (`flight_info_id` + `operation`) and the views never join on call sign. Still affects the chatbot while it uses `AIplane`.
+- See [Team 6 schema issue 1](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues). Both fallback templates and the prompt's example join only on `call_sign` (the operation is filtered on each side, but duplicates remain).
 
 #### C5. Summaries are based on 3 rows (MEDIUM)
 - `_generate_insights` only shows Claude `data[:3]`, so summaries of longer results can be wrong, e.g. calling something "the highest" when the results aren't sorted.
@@ -325,7 +369,7 @@ Ordered by severity within each group. **(Verified)** means we reproduced it by 
 | D4 | **No tests, no evaluation set, no CI.** The 91% accuracy claim can't be checked |
 | D5 | **Tailwind isn't set up** to build new classes (see [TECH_STACK.md](TECH_STACK.md#1-frontend-frontend)) |
 | D6 | **Very noisy logging.** Every step `print`s/`console.log`s, including full SQL and user questions |
-| D7 | `db_manager.py import-excel` is broken (§2.5) |
+| D7 | `db_manager.py import-excel` is broken (§2.5). ✅ **Resolved in the new `seatac` data**: the new export is loaded by `load_aerobahn.py` (§2.7) |
 | D8 | The README describes a different system: "Flask API server" in the structure section, "CodeLlama-7B + Claude 4.5 Haiku", Electron quick start, `/api/stats`. **The license is Apache 2.0 in `LICENSE` but "MIT" in the README** |
 | D9 | `@app.on_event("startup")` is deprecated in FastAPI. It works, but will warn on upgrade |
 | D10 | Leftover names: the page title is "AI Natural Language Feature" (`src/frontend/index.html`), the assistant is called "Gate Assistant", and the app is branded "AIport" |
@@ -349,7 +393,7 @@ Ordered by severity within each group. **(Verified)** means we reproduced it by 
 2. **Is the Railway deployment still live, and who owns it?** Where is its MySQL hosted, and which `CLAUDE_MODEL` does it use? (Ask Abhishek.)
 3. **Where did the 91% accuracy figure come from?** Is there a test set outside the repo?
 4. **Which spreadsheet did Jo import with the ramp changes, and why isn't the regenerated data committed?**
-5. **Runway events:** does the Port confirm that the export only records runway entry for departures and exit for arrivals ([DB_SCHEMA.md issue 4](DB_SCHEMA.md#known-schema-issues))? What's the correct runway-occupancy formula?
+5. **Runway events:** does the Port confirm that the export only records runway entry for departures and exit for arrivals ([Team 6 schema issue 4](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues))? What's the correct runway-occupancy formula? ✅ **Answered:** it's structural (entry recorded for departures, exit for arrivals), and Samer confirmed per-operation definitions; see [DATA_CHANGES.md](DATA_CHANGES.md).
 6. **Duplicate call signs:** are the 10 same-operation duplicates real (e.g. two flights reusing a call sign), or import errors?
 7. **Taxiway names:** how do segment codes like `TaxiwaySegment_B_28` map to the "Tango, Hotel, Whiskey" taxiways in the user story?
 8. **Is the desktop (Electron) app still a requirement?**

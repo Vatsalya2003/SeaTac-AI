@@ -113,7 +113,7 @@ DB_NAME=AIplane
 >
 > 💳 **Claude needs API credit**, which is separate from any Claude.ai or Claude Code subscription. The key must also be created *inside a workspace* (Console → Settings → Workspaces → API Keys). Otherwise you get "credit balance is too low" or "not scoped to a workspace" errors.
 
-> 🔒 **Never commit `.env`.** It contains your API key. ⚠️ The original repo had **no `.gitignore`** at all. One was added on 2026-10-01; until it's committed and you've pulled it, `.env`, `venv/` and `node_modules/` aren't protected. Before every commit, run `git status` and make sure `.env` isn't listed.
+> 🔒 **Never commit `.env`.** It contains your API key. The repo's `.gitignore` excludes `.env`, `venv/`, `node_modules/` and the Port data files, but run `git status` before every commit and make sure none of them is listed.
 
 **Start the backend** (keep this terminal open):
 
@@ -157,6 +157,52 @@ Some questions give wrong answers or no data because of known bugs. **Avoid thes
 - Runway, taxiway and peak-hour questions are often wrong.
 
 Details are in [DEVELOPER_GUIDE.md §6](DEVELOPER_GUIDE.md#6-known-issues).
+
+---
+
+## Step 6 (optional): Load the Port's new data (`seatac`)
+
+The Port's updated export is used for the new metric views. **The chatbot doesn't use it yet**, so skip this step if you only want to run the app.
+
+**6a. Get the file privately.** Ask the team lead for `August_8_and_9_2025_Anonymized.xlsx` (shared through the team's private drive, never GitHub, Slack channels or email to outsiders). It contains real aircraft tail numbers and transponder codes.
+- Save it **outside** the repo, or in the repo root, where `.gitignore` blocks `*Anonymized*.xlsx`.
+- Never commit it, and never commit a database dump made from it.
+
+**6b. Install the data-script packages** (a separate venv from the backend's):
+
+```bash
+cd SeaTac-AI/src/database
+python3.12 -m venv venv
+source venv/bin/activate          # Windows: venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+**6c. Load it** (MySQL must be running; the script uses the `DB_*` settings in `src/backend/.env`):
+
+```bash
+cd scripts
+python load_aerobahn.py --file /path/to/August_8_and_9_2025_Anonymized.xlsx
+# or: export SEATAC_DATA_FILE=/path/to/...xlsx && python load_aerobahn.py
+```
+
+It drops and rebuilds the `seatac` database every time (it never touches `AIplane`). It takes under a minute and ends with `Loaded into seatac: raw_flight_details 1061, flights 1061, aircraft_types 16`.
+
+**6d. Verify:**
+
+```bash
+python check_seatac.py
+```
+
+You should see 1,061 legs (525 arrivals, 535 departures, 1 missed approach), `duplicate (flight_info_id, operation) pairs = 0`, every `sea_date` = 2025-08-08, and every view in `metric_rules.yaml` marked `exists`. The script prints counts and exclusions only, never metric averages. The full expected output is in [DB_SCHEMA.md → check results](DB_SCHEMA.md#check-results-2026-10-19-check_seatacpy).
+
+**Optional baseline:** `python build_aiplane_v2.py --file /path/to/...xlsx` builds `AIplane_v2`, the new data in Team 6's old table layout, for testing the unchanged chatbot.
+
+| Problem | Fix |
+|---|---|
+| `give --file or set SEATAC_DATA_FILE` | Pass the file path |
+| `Missing expected columns: [...]` | It's a different export version; tell the team before changing the loader |
+| `No space left on device` | Free disk space; MySQL needs room to create the database |
+| `Access denied` | Check `DB_USER` / `DB_PASSWORD` in `src/backend/.env` |
 
 ---
 

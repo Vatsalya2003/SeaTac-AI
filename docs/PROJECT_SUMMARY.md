@@ -22,7 +22,7 @@ This is a **chat app for airport data.** A manager at Seattle-Tacoma Internation
 
 ### The "10 core questions"
 
-The client wrote these (`OLD Data/technical/Gate Query User Story.docx` (in the team's OLD Data folder; not in this repo)). Every generation of the project has been scoped around them. For what the terms mean (taxi-in, off-block, and so on), see the event glossary in [DB_SCHEMA.md → Event types](DB_SCHEMA.md#event-types-what-each-one-means).
+The client wrote these (`OLD Data/technical/Gate Query User Story.docx` (in the team's OLD Data folder; not in this repo)). Every generation of the project has been scoped around them. For what the terms mean (taxi-in, off-block, and so on), see the event glossary in [Team 6 schema → Event types](legacy/DB_SCHEMA_TEAM6.md#event-types-what-each-one-means).
 
 | # | Question | Why leadership wants it |
 |---|---|---|
@@ -100,7 +100,7 @@ Sources: the mid-term deck `OLD Data/Port-of-Seattle-SEA-Airfield-Data-Intellige
 - They **hit Gemini's free-tier limit (20 requests/day)**, so they fine-tuned **Gemma 2-2B** on Modal for $0.35 (PDF p.8).
 - They **dropped LangChain agents** because of breaking changes in LangChain v1.2.10 and orchestrated the steps by hand instead (PDF p.6, p.8).
 - **Targets:** at least 90% accuracy and answers in 5 seconds or less. **Status:** 4 of the 10 questions working end-to-end (PDF p.10–11).
-- **Data finding:** about **50% of runway events are missing in the source data** (not an ETL bug). This affects Q3, Q4 and Q9 (PDF p.4). ⚠️ When we checked, the pattern looks structural, not like missing data: departures only have a runway *entrance*, and arrivals only a runway *exit*. See [DB_SCHEMA.md → issue 4](DB_SCHEMA.md#known-schema-issues).
+- **Data finding:** about **50% of runway events are missing in the source data** (not an ETL bug). This affects Q3, Q4 and Q9 (PDF p.4). ⚠️ When we checked, the pattern looks structural, not like missing data: departures only have a runway *entrance*, and arrivals only a runway *exit*. See [Team 6 schema → issue 4](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues).
 
 ### What the code actually became (from git)
 
@@ -109,7 +109,7 @@ Sources: the mid-term deck `OLD Data/Port-of-Seattle-SEA-Airfield-Data-Intellige
 | Mar 11 | `ffcd4e8` | First FastAPI backend: LangChain plus **Gemini 2.5-flash** |
 | Mar 13 | `f2dbd2c` | "Modal Edition v7.0": a **fine-tuned CodeLlama-7B** on Modal writes the SQL, and **OpenRouter** (Gemini 2.0 flash) checks it |
 | Mar 18 | several | Frontend and database files uploaded to this repo |
-| Mar 24 | `7c13e84`, `7feb7e9` (Jo) | Four **ramp event types** added to the schema and the import script (details in [DB_SCHEMA.md](DB_SCHEMA.md#known-schema-issues)) |
+| Mar 24 | `7c13e84`, `7feb7e9` (Jo) | Four **ramp event types** added to the schema and the import script (details in [Team 6 schema](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues)) |
 | Apr 13 | `90b73ee` | "Claude Validator v7.4": **Claude replaces OpenRouter** as the SQL checker. Saved as `backend/app.py` |
 | May 4 | `bd96976`, `a1bd9f2` | **`backend/app_optimized.py` v8.0**: Claude writes the SQL directly and Modal is switched off "for presentation speed". **Railway deployment** config added |
 | May 5 | many | Frontend: login screen, CSV export, chart/table toggle |
@@ -157,7 +157,7 @@ Sources: the mid-term deck `OLD Data/Port-of-Seattle-SEA-Airfield-Data-Intellige
 | `OLD Data/technical/700-041227_Data_Dictionary V2.xlsx` (in the team's OLD Data folder; not in this repo) | Official definitions of the Aerobahn/SAMS fields |
 | `OLD Data/technical/cleaned_user_story_columns.xlsx` (in the team's OLD Data folder; not in this repo) | The raw columns filtered per question (one sheet per question) |
 | `OLD Data/technical/AerobahnDW_sample_anonymized.xlsx` (in the team's OLD Data folder; not in this repo) | The raw 593-column export |
-| `OLD Data/technical/aerobahn_thematic_tables.xlsx` (in the team's OLD Data folder; not in this repo) | An alternative split into flights/aircraft/assignments/events. ⚠️ It seems to be what Jo's import script expects; see [DB_SCHEMA.md](DB_SCHEMA.md#known-schema-issues) |
+| `OLD Data/technical/aerobahn_thematic_tables.xlsx` (in the team's OLD Data folder; not in this repo) | An alternative split into flights/aircraft/assignments/events. ⚠️ It seems to be what Jo's import script expects; see [Team 6 schema](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues) |
 | `OLD Data/technical/Arrival Hold Visual.jpg` (in the team's OLD Data folder; not in this repo) | Picture defining hold time, taxi time and gate-rest time |
 | `OLD Data/technical/Seattle SAMS Saab User Conference.pdf` (in the team's OLD Data folder; not in this repo) | Background on SAMS, gate holds and predicted off-block time. SEA has 3 runways and 88 gates |
 | `OLD Data/technical/Airport Operations Database as of 9Aug2022.pdf` (in the team's OLD Data folder; not in this repo) | Where the Port's data comes from (a diagram of the systems feeding its operations database) |

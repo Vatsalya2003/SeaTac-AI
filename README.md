@@ -46,34 +46,29 @@ Sample Query and Response
 
 ## Quick Start
 
+Needs MySQL 8+, Python 3.11/3.12 and Node 18+. The full, tested walkthrough is in [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
+
 ```bash
-# 1. Clone repository
-cd AIport
+# 1. Clone and load the chatbot's database (Team 6's sample data, AIplane)
+git clone https://github.com/Vatsalya2003/SeaTac-AI.git && cd SeaTac-AI
+mysql -u root -p -e "source src/database/data/AIplane.sql"
 
-# 2. Setup database
-mysql -u root -p < src/database/data/AIplane.sql
-
-# 3. Configure backend
+# 2. Backend: create src/backend/.env by hand with CLAUDE_API_KEY and DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME=AIplane
 cd src/backend
-cp .env.example .env
-# Edit .env: add CLAUDE_API_KEY and DATABASE_PASSWORD
-       .env: add MODAL_API_KEY for fine-tuned LLM
-
-# 4. Install dependencies
+python3.12 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cd ../frontend && npm install
-cd ../.. && npm install
+uvicorn app_optimized:app --reload --port 8000          # check http://localhost:8000/api/health
 
-# 5. Run application
-# Terminal 1: Start backend
-cd src/backend && python app.py
+# 3. Frontend (second terminal)
+cd src/frontend && npm install && npm run dev           # open http://localhost:3000
 
-# Terminal 2: Start desktop app
-npm run dev
+# 4. Optional: load the Port's updated data into the new `seatac` database (file obtained privately)
+cd src/database && python3.12 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cd scripts && python load_aerobahn.py --file /path/to/August_8_and_9_2025_Anonymized.xlsx && python check_seatac.py
 ```
 
-See [QUICK_START.md](QUICK_START.md) for detailed instructions.
-A tested, step-by-step setup is in [docs/SETUP_GUIDE.md](docs/SETUP_GUIDE.md).
+> **Port of Seattle data is not in this repo.** The Port's updated export (`August_8_and_9_2025_Anonymized.xlsx`) contains real tail numbers and transponder codes. It is shared privately within the team and must never be committed, and neither may any dump of the `seatac` or `AIplane_v2` databases (`.gitignore` blocks the usual file names). The new database is documented in [docs/DB_SCHEMA.md](docs/DB_SCHEMA.md), and the differences from the old sample in [docs/DATA_CHANGES.md](docs/DATA_CHANGES.md). The chatbot still uses the old `AIplane` database until it is switched to the new views.
 
 ## Project Structure
 
