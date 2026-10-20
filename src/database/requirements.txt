@@ -1,0 +1,6 @@
+# Packages for the database scripts (load_aerobahn.py, check_seatac.py, db_manager.py)
+pandas>=2.2,<4
+openpyxl>=3.1,<4
+PyMySQL>=1.1,<2
+python-dotenv>=1.0,<2
+PyYAML>=6.0,<7  # check_seatac.py validates metric_rules.yaml
