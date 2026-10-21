@@ -77,6 +77,35 @@ def test_missed_approach_flagged_and_not_counted(db, report):
     assert elsewhere == 0, "the missed approach appears in v_taxi_in or v_taxiway_usage"
 
 
+def test_missing_runway_excluded_from_q9_but_counted_in_q10(db, excel, report):
+    """A take-off or landing with no runway (QTA2016 in this data) is left out of per-runway counts (Q9,
+    exclusion_reason 'missing runway') but still counted in its hour in v_peak_hours (Q10 needs no runway)."""
+    no_runway = excel["Runway"].isna() & excel["Operation"].isin(["Arrival", "Departure"])
+    keys = [(int(i), op) for i, op in zip(excel.loc[no_runway, "Flight Info ID"], excel.loc[no_runway, "Operation"])]
+    bad = []
+    for key in keys:
+        found = rows(db, """SELECT exclusion_reason, included, local_date, local_hour FROM v_runway_activity
+                            WHERE flight_info_id = %s AND operation = %s""", key)
+        if not found or found[0][:2] != ("missing runway", 0):
+            bad.append(f"{key[0]}: not excluded as 'missing runway' (Q9)")
+            continue
+        day, hour = found[0][2:]
+        in_runway_counts = rows(db, """SELECT COUNT(*) FROM v_runway_activity
+                                       WHERE included = 1 AND flight_info_id = %s AND operation = %s""", key)[0][0]
+        legs_in_hour = rows(db, """SELECT COUNT(*) FROM v_runway_activity WHERE local_date = %s AND local_hour = %s
+                                   AND activity_time IS NOT NULL AND is_missed_approach = 0""", (day, hour))[0][0]
+        peak = rows(db, "SELECT operations FROM v_peak_hours WHERE local_date = %s AND local_hour = %s", (day, hour))
+        counted_in_q10 = bool(peak) and peak[0][0] == legs_in_hour  # legs_in_hour includes this leg
+        if in_runway_counts:
+            bad.append(f"{key[0]}: counted per runway (Q9)")
+        if not counted_in_q10:
+            bad.append(f"{key[0]}: not counted in v_peak_hours (Q10)")
+    report(f"missing runway: {len(keys)} legs, {len(keys) - len({b.split(':')[0] for b in bad})} excluded from Q9 "
+           f"and counted in Q10, {len({b.split(':')[0] for b in bad})} wrong")
+    assert "QTA2016" in set(excel.loc[no_runway, "Call Sign"]), "QTA2016 no longer has a missing runway in the data"
+    assert not bad, f"missing-runway handling wrong: {bad}"
+
+
 def test_shared_flight_info_id_gives_two_legs(db, excel, report):
     ids = excel["Flight Info ID"]
     shared = {int(i): set(excel.loc[ids == i, "Operation"]) for i in ids[ids.duplicated()].unique()}

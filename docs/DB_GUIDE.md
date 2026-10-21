@@ -1,6 +1,6 @@
 # SeaTac AI database guide (`seatac`)
 
-**For:** team members working on or using the new database **Branch:** `test_1` · **Status:** built, checked and tested (98 tests pass, 1 intentional skip) **Related docs in the repo:** [DB_SCHEMA.md](DB_SCHEMA.md) (full column list), [DATA_CHANGES.md](DATA_CHANGES.md) (old vs new data), [CLIENT_CONFIRMED_RULES.md](CLIENT_CONFIRMED_RULES.md) (the Port’s rules), [SETUP_GUIDE.md](SETUP_GUIDE.md) (setup), [DEVELOPER_GUIDE.md §2.8](DEVELOPER_GUIDE.md#28-testing) (tests)
+**For:** team members working on or using the new database **Branch:** `test_1` · **Status:** built, checked and tested (99 tests pass, 1 intentional skip) **Related docs in the repo:** [DB_SCHEMA.md](DB_SCHEMA.md) (full column list), [DATA_CHANGES.md](DATA_CHANGES.md) (old vs new data), [CLIENT_CONFIRMED_RULES.md](CLIENT_CONFIRMED_RULES.md) (the Port’s rules), [SETUP_GUIDE.md](SETUP_GUIDE.md) (setup), [DEVELOPER_GUIDE.md §2.8](DEVELOPER_GUIDE.md#28-testing) (tests)
 
 ---
 
@@ -277,14 +277,14 @@ This gives the same question the same SQL and the same numbers every time. The c
 
 ## 13. Testing
 
-Run `pytest -q` from `src/database`. The current result is **98 passed, 1 skipped** (the intentional selection-timestamp index test). Details are in `docs/DEVELOPER_GUIDE.md` §2.8.
+Run `pytest -q` from `src/database`. The current result is **99 passed, 1 skipped** (the intentional selection-timestamp index test). Details are in `docs/DEVELOPER_GUIDE.md` §2.8.
 
 | Area | What it checks |
 | --- | --- |
 | Structure | Keys, foreign keys, NOT NULL, the `operation` CHECK, indexes |
 | Integrity | Counts match Excel, unique key, every row has a raw row, the Seattle-side rule, times identical to Excel |
 | Rules | Every view matches an independent pandas recalculation from the Excel file, flight by flight |
-| Edge cases | Midnight crossings, missing times, QTA3199, the missed approach, the shared ID, Unknown groups, “No data”, ties, on-the-hour events, the 76-second example |
+| Edge cases | Midnight crossings, missing times, QTA3199, the missed approach, the leg with no runway (out of Q9, in Q10), the shared ID, Unknown groups, “No data”, ties, on-the-hour events, the 76-second example |
 | Reproducibility and determinism | Rebuilding gives identical tables; each view returns identical rows twice |
 | Speed | Every view under 500 ms (slowest 37 ms) |
 | Security | `seatac_reader` can read the views only, and can’t change anything |
