@@ -36,3 +36,6 @@ src/database/data/seatac*.sql
 src/database/data/AIplane_v2*.sql
 *_dump*.sql
 *.sql.gz
+
+# Local run logs (may contain questions and generated SQL)
+logs/
