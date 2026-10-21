@@ -62,7 +62,7 @@ One row per flight leg that touches SEA. 367 departures and 358 arrivals.
 | `flight_ID` | `VARCHAR(20)` | The flight identifier from the source export | Identical to `call_sign` in every row, so it adds no information |
 | `aircraft_type` | `VARCHAR(20)`, FK → `aircraft_type` | Which aircraft model flew this leg | Never null. 9 originally-missing values were filled with `UNKNOWN_###` |
 | `flight_number` | `VARCHAR(20)` | The number part of the flight, e.g. `'328'` | Stored as text even though it's numeric |
-| `aircraft_registration` | `VARCHAR(20)` | The aircraft's tail number (e.g. `N12345`, placeholder), identifying the physical plane | 7 nulls |
+| `aircraft_registration` | `VARCHAR(20)` | The aircraft's tail number (`<tail number>`), identifying the physical plane | 7 nulls |
 | `origin_airport` | `VARCHAR(10)` | Departure airport as a 4-letter ICAO code (`KSEA` = Seattle, `KORD` = Chicago O'Hare) | 3 nulls |
 | `destination_airport` | `VARCHAR(10)` | Arrival airport, ICAO code | 3 nulls |
 | `departure_procedure` | `VARCHAR(50)` | The published departure route (a "SID", e.g. `MONTN2`) filed for the leg's departure airport | 92 nulls |
