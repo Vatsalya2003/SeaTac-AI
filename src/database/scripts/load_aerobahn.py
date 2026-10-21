@@ -29,6 +29,9 @@ VIEWS_SQL = DATABASE_DIR / "sql" / "seatac_views.sql"
 PROTECTED_DATABASES = {"aiplane", "aiplane_v2", "mysql", "sys", "information_schema", "performance_schema"}
 BATCH_SIZE = 500
 
+# The only operations in the export; enforced by a CHECK constraint on both tables.
+OPERATIONS_SQL = "('Arrival', 'Departure', 'Missed Approach')"
+
 # Original Excel columns that become the primary key. MySQL column names are case-insensitive,
 # so `Operation` and `operation` can't both exist: the originals are renamed, not duplicated.
 PK_RENAMES = {"Flight Info ID": "flight_info_id", "Operation": "operation"}
@@ -250,7 +253,8 @@ def main():
 
             raw_ddl = ",\n  ".join([f"{quote('flight_info_id')} BIGINT NOT NULL", f"{quote('operation')} VARCHAR(20) NOT NULL"]
                                    + [f"{quote(c)} {raw_types[c]} NULL" for c in raw_cols])
-            cur.execute(f"CREATE TABLE raw_flight_details (\n  {raw_ddl},\n  PRIMARY KEY (flight_info_id, operation)\n)"
+            cur.execute(f"CREATE TABLE raw_flight_details (\n  {raw_ddl},\n  PRIMARY KEY (flight_info_id, operation),\n"
+                        f"  CONSTRAINT chk_raw_operation CHECK (operation IN {OPERATIONS_SQL})\n)"
                         " ENGINE=InnoDB ROW_FORMAT=DYNAMIC COMMENT='Every non-empty column of the Aerobahn export, original names'")
 
             ac_ddl = ",\n  ".join(["aircraft_type VARCHAR(20) NOT NULL"] + [f"{c} {t} NULL" for c, (_, t) in AIRCRAFT_COLUMNS.items()])
@@ -263,8 +267,12 @@ def main():
                 + ["sea_date DATE NULL"] + [f"{c} INT NULL" for c in SYS_DURATIONS] + ["source_file VARCHAR(255) NOT NULL"])
             cur.execute(
                 f"CREATE TABLE flights (\n  {fl_ddl},\n  PRIMARY KEY (flight_info_id, operation),\n"
-                "  KEY idx_flights_aircraft_type (aircraft_type),\n  KEY idx_flights_sea_date (sea_date),\n"
-                "  CONSTRAINT fk_flights_aircraft_type FOREIGN KEY (aircraft_type) REFERENCES aircraft_types (aircraft_type)\n"
+                "  KEY idx_flights_operation (operation),\n  KEY idx_flights_aircraft_type (aircraft_type),\n"
+                "  KEY idx_flights_runway (runway),\n  KEY idx_flights_sea_date (sea_date),\n"
+                f"  CONSTRAINT chk_flights_operation CHECK (operation IN {OPERATIONS_SQL}),\n"
+                "  CONSTRAINT fk_flights_aircraft_type FOREIGN KEY (aircraft_type) REFERENCES aircraft_types (aircraft_type),\n"
+                "  CONSTRAINT fk_flights_raw FOREIGN KEY (flight_info_id, operation)"
+                " REFERENCES raw_flight_details (flight_info_id, operation)\n"
                 ") ENGINE=InnoDB COMMENT='One row per flight leg at SEA. SEA-side times only (other-airport times are NULL; "
                 "originals in raw_flight_details). Local PDT, not shifted'")
 

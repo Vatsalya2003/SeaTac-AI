@@ -29,7 +29,7 @@
 
 ```mermaid
 erDiagram
-  raw_flight_details ||--|| flights : "cleaned into"
+  raw_flight_details ||--o| flights : "cleaned into (fk_flights_raw)"
   aircraft_types ||--o{ flights : "type of plane"
   flights ||--o{ v_taxi_in : feeds
   flights ||--o{ v_taxi_out : feeds
@@ -40,8 +40,8 @@ erDiagram
   flights ||--o{ v_runway_activity : feeds
   raw_flight_details { bigint flight_info_id PK
                        varchar operation PK }
-  flights { bigint flight_info_id PK
-            varchar operation PK
+  flights { bigint flight_info_id PK,FK
+            varchar operation PK,FK
             varchar call_sign
             varchar aircraft_type FK
             char weight_class_icao
@@ -70,11 +70,16 @@ erDiagram
 
 | Table | Primary key | Notes |
 |---|---|---|
-| `raw_flight_details` | (`flight_info_id`, `operation`) | Same key as `flights`, one-to-one |
+| `raw_flight_details` | (`flight_info_id`, `operation`) | Same key as `flights`, one-to-one. `flights` (`flight_info_id`, `operation`) → `raw_flight_details` (`flight_info_id`, `operation`) is a real foreign key (`fk_flights_raw`), so every clean row provably comes from a raw row. 0 orphans |
 | `flights` | (`flight_info_id`, `operation`) | **Unique** (0 duplicates). `flight_info_id` alone repeats for **2** IDs: one Arrival + Departure pair and one Arrival + Missed Approach pair, which is why `operation` is part of the key |
 | `aircraft_types` | `aircraft_type` | `flights.aircraft_type` → `aircraft_types.aircraft_type` is a real foreign key (`fk_flights_aircraft_type`). It allows NULL for the **3** legs with no FAA type. 0 orphans |
 
 **Join rule:** always join on both `flight_info_id` **and** `operation`. Call signs are not a key.
+
+**Constraints and indexes:**
+- **CHECK constraints:** `operation IN ('Arrival', 'Departure', 'Missed Approach')` on both `raw_flight_details` (`chk_raw_operation`) and `flights` (`chk_flights_operation`), so no other value can be stored.
+- **Indexes on `flights`:** the primary key, `idx_flights_operation`, `idx_flights_aircraft_type`, `idx_flights_runway` and `idx_flights_sea_date`.
+- **Selection timestamps are not indexed, on purpose.** `selection_date` is computed in the views, so it can't be indexed itself; the timestamps it comes from (`wheels_down`, `actual_off_block`, `wheels_up`, `runway_entrance`, `runway_exit`, `movement_area_entrance`, `movement_area_exit`) could be. The slowest view query takes 37 ms on 1,061 rows, so this is skipped for now (the test is marked skipped). Revisit with live data.
 
 ---
 
@@ -97,7 +102,7 @@ erDiagram
 | Column | Type | Source Excel column | Meaning | Filled (Arr / Dep / MA) |
 |---|---|---|---|---|
 | `flight_info_id` | BIGINT, PK | Flight Info ID | Aerobahn's flight record ID | 525 / 535 / 1 |
-| `operation` | VARCHAR(20), PK | Operation | `Arrival`, `Departure` or `Missed Approach` | 525 / 535 / 1 |
+| `operation` | VARCHAR(20), PK, CHECK | Operation | `Arrival`, `Departure` or `Missed Approach` (enforced by `chk_flights_operation`) | 525 / 535 / 1 |
 | `call_sign` | VARCHAR(20) | Call Sign | Radio call sign (anonymised, e.g. `QTA3199`). **Not unique** | all |
 | `carrier` | VARCHAR(20) | Carrier | Airline code (anonymised) | all |
 | `carrier_group` | VARCHAR(50) | Carrier Group | Airline group | all |
@@ -207,7 +212,7 @@ View-specific reasons: `'missing scheduled take-off'` / `'missing take-off'` (`v
 
 Counts and differences only. **Metric averages are deliberately not shown**: the team computes expected answers independently.
 
-**Rows and keys:** 1,061 legs (525 / 535 / 1). The key is unique. 2 `flight_info_id` values repeat. Every `sea_date` = 2025-08-08. 16 aircraft types, 3 legs with no type, 0 foreign-key orphans.
+**Rows and keys:** 1,061 legs (525 / 535 / 1). The key is unique. 2 `flight_info_id` values repeat. Every `sea_date` = 2025-08-08. 16 aircraft types, 3 legs with no type, 0 foreign-key orphans (both `fk_flights_aircraft_type` and `fk_flights_raw`).
 
 | View | Rows | Included | Excluded |
 |---|---|---|---|
