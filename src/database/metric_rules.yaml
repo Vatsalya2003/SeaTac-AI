@@ -1,100 +1,129 @@
 # Metric rules for the `seatac` database.
-# One entry per metric: the definition the chatbot shows users, the view that computes it,
-# the groupings it may use, and known limits. Definitions confirmed by Samer (Port of Seattle).
-# Views live in sql/seatac_views.sql. Every view has `exclusion_reason` (NULL = used) and `included`.
-version: 1
+# One entry per metric: the definition the chatbot shows users, the view that computes it, how rows are selected
+# into a reporting window, the groupings it may use, and known limits.
+# Definitions confirmed by the Port of Seattle: see docs/CLIENT_CONFIRMED_RULES.md (2026-10-15) and the
+# later confirmations noted below. Views live in sql/seatac_views.sql.
+version: 2
 database: seatac
-timezone: "Local time at SEA (PDT). Times are never shifted."
+confirmed_rules_source: docs/CLIENT_CONFIRMED_RULES.md
+timezone: "SEA local time (PDT), stored exactly as exported and never shifted. No daylight-saving change falls inside this data."
 data_scope: "One operating day at SEA: 2025-08-08 (from the Port's August 8-9 2025 export)."
 
 # Which metric answers each of the Port's 10 questions (Gate Query User Story, "Final 10 Questions").
 questions:
   Q1:  {title: "Taxi-In Performance (by aircraft type)", metrics: [taxi_in], group_by: aircraft_type}
-  Q2:  {title: "Taxi-Out Performance (by hour of day)", metrics: [taxi_out], group_by: off_block_hour}
+  Q2:  {title: "Taxi-Out Performance (by hour of day)", metrics: [taxi_out], group_by: selection_hour}
   Q3:  {title: "Movement Area Occupancy", metrics: [movement_area_peak, movement_area_time]}
   Q4:  {title: "Runway Occupancy Time", metrics: [runway_occupancy]}
   Q5:  {title: "Wheels-Up Delay Tracker", metrics: [takeoff_delay]}
-  Q6:  {title: "Weight Class Comparison (taxi duration)", metrics: [taxi_in, taxi_out], group_by: weight_class_icao}
+  Q6:  {title: "Weight Class Comparison (taxi duration)", metrics: [taxi_in, taxi_out], group_by: weight_class_group}
   Q7:  {title: "Taxiway Utilization", metrics: [taxiway_usage]}
-  Q8:  {title: "Landing - In-Block Duration", metrics: [taxi_in]}
+  Q8:  {title: "Landing - In-Block Duration", metrics: [taxi_in], group_by: none}   # one overall average across all eligible arrivals
   Q9:  {title: "Runway Utilization Rate", metrics: [runway_utilization]}
   Q10: {title: "Peak Hour Prediction (history only)", metrics: [peak_hours]}
 
 common_rules:
-  - "Only rows with included = 1 (exclusion_reason IS NULL) go into averages, counts and charts."
-  - "Report how many rows were excluded and why (exclusion_reason) alongside every answer."
-  - "Durations are end minus start. 'negative duration' rows are excluded, except take-off delay where negative = early."
-  - "A flight leg is identified by flight_info_id + operation. Count legs with COUNT(*) or COUNT(DISTINCT flight_info_id, operation)."
+  - "Identify flights by flight_info_id + operation, never by call sign. Count legs with COUNT(*) or COUNT(DISTINCT flight_info_id, operation)."
+  - "Select rows into a reporting window by selection_time (each view sets it from the confirmed selection rule). Windows include the start and exclude the end. Reporting days are local midnight-to-midnight."
+  - "Times are SEA local (PDT) exactly as exported. Never convert or shift them. Show full dates and timestamps across midnight."
+  - "Only rows with included = 1 (exclusion_reason IS NULL) go into averages, counts and charts. Rows with missing endpoints or negative durations are excluded."
+  - "Report included and excluded counts, and the exclusion reasons, with every answer. Always show the sample size."
+  - "Keep zero and very long durations. There is no upper cutoff and no 1-120 minute filter."
+  - "Negative take-off delay is a valid early departure and is kept."
+  - "No minimum group size is required."
+  - "Calculate at full timestamp precision. Display average minutes rounded to 2 decimals: ROUND(AVG(duration_min), 2)."
+  - "Show 'No data' for a group with no eligible rows. Never show 0 in its place."
 
 metrics:
   taxi_in:
     questions: [Q1, Q6, Q8]
-    definition: "Taxi-in time is the time from wheels down (touchdown) to actual in-block (parked at the gate), for arrivals at SEA, in minutes."
+    definition: "Taxi-in time is the time from wheels down (touchdown) to actual in-block (arrival at parking), for arrivals at SEA, in minutes."
     view: v_taxi_in
     value_column: duration_min
-    allowed_groupings: [aircraft_type, weight_class_icao, carrier, runway, gate]
+    selection: "Arrivals selected by wheels-down time (selection_time = wheels_down)."
+    allowed_groupings: [aircraft_type, weight_class_group, carrier, runway, gate]
     known_limits:
-      - "Weight classes in this data are only M (medium) and H (heavy); there are no light aircraft."
-      - "Q8 (landing to in-block) uses the same definition as taxi-in."
+      - "End confirmed as actual in-block. Never use Actual Landing in place of wheels down (equivalence not confirmed by the Port)."
+      - "Q8 uses the same interval with no grouping: one overall average across all eligible arrivals. Q1 gives the aircraft-type breakdown."
+      - "Long durations are valid and kept (e.g. QTA3199)."
 
   taxi_out:
     questions: [Q2, Q6]
-    definition: "Taxi-out time is the time from actual off-block (pushback from the gate) to wheels up (take-off), for departures from SEA, in minutes."
+    definition: "Taxi-out time is the time from actual off-block (departure from parking) to wheels up (take-off), for departures from SEA, in minutes."
     view: v_taxi_out
     value_column: duration_min
-    allowed_groupings: [off_block_hour, off_block_date, aircraft_type, weight_class_icao, carrier, runway, gate]
+    selection: "Departures selected by off-block time (selection_time = actual_off_block), not sea_date: a flight pushing back before midnight belongs to the earlier day."
+    allowed_groupings: [selection_hour, selection_date, aircraft_type, weight_class_group, carrier, runway, gate]
     source: "Off-block time is Aerobahn's Actual Off Block Time (confirmed by the Port)."
     known_limits:
-      - "Hour of day is the local hour of actual off-block."
+      - "Hour of day is the local hour of actual off-block (selection_hour, also available as off_block_hour)."
       - "The export's own Actual Taxi Out Time uses AODB off-block, so it differs from this metric by design."
-      - "Weight classes in this data are only M (medium) and H (heavy)."
+
+  weight_classes:
+    questions: [Q6]
+    definition: "ICAO weight-class groups for Q6: L (Light), M (Medium), H (Heavy), plus Unknown for legs with no class."
+    view: v_weight_classes
+    usage: "LEFT JOIN v_weight_classes to v_taxi_in / v_taxi_out on weight_class_group, so every group is listed. Show arrival (Q1) and departure (Q2) averages separately."
+    known_limits:
+      - "This data has only M and H, so Light and Unknown show 'No data' (never 0)."
 
   movement_area_time:
     questions: [Q3]
-    definition: "Time in the movement area: for arrivals, wheels down to movement-area exit. For departures, movement-area entrance to wheels up."
+    definition: "Time in the movement area: for arrivals, touchdown (wheels down) until exit from the area toward parking. For departures, entry into the area until take-off (wheels up)."
     view: v_movement_area
     value_column: duration_min
+    selection: "Intervals overlapping the window count: start_time < window_end AND end_time > window_start."
     allowed_groupings: [operation, runway, aircraft_type, weight_class_icao]
     known_limits:
-      - "PENDING PORT CONFIRMATION: the movement-area boundary (whether runway time counts as movement-area time)."
+      - "Entry time counts and exit time doesn't (interval [start, end))."
+      - "PENDING PORT CONFIRMATION: mapping Aerobahn's Movement Area Entrance/Exit events to the client's hatched-area boundary."
+      - "The export has one entrance/exit pair per leg, so an exit and re-entry within a leg is not visible."
 
   movement_area_peak:
     questions: [Q3]
-    definition: "The maximum number of aircraft in the movement area at the same time, for each local hour."
+    definition: "The highest number of aircraft simultaneously present in the movement area during each local hour."
     view: v_movement_area_hourly_peak
     value_column: max_aircraft_in_area
+    selection: "Intervals overlapping each hour count. An aircraft is never counted twice at one moment."
     allowed_groupings: [local_date, local_hour]
     known_limits:
-      - "PENDING PORT CONFIRMATION: same movement-area boundary as movement_area_time."
-      - "Aircraft with a missing or negative interval are not counted."
+      - "Report intervals_used and intervals_excluded (by reason) with the answer; aircraft with a missing or negative interval are not counted."
+      - "Same pending boundary mapping and re-entry limit as movement_area_time."
+      - "Simultaneous aircraft counts are a separate measure from taxi durations."
 
   runway_occupancy:
     questions: [Q4]
-    definition: "Runway occupancy is the time an aircraft is on the runway: for arrivals, wheels down to runway exit. For departures, runway entrance to wheels up. In seconds."
+    definition: "Runway occupancy is the time an aircraft is on the runway: for arrivals, touchdown (wheels down) until it leaves the runway. For departures, runway entry until take-off (wheels up). In seconds."
     view: v_runway_occupancy
     value_column: duration_sec
+    selection: "By the start of the occupancy interval (selection_time): touchdown for arrivals, runway entry for departures."
     allowed_groupings: [runway, operation, aircraft_type, weight_class_icao]
     known_limits:
+      - "Clear Active is not used (Port instruction). The export's own Runway Occupancy Time uses CrossThreshold and Clear Active, so it differs by design."
       - "Arrivals and departures are measured from different events, so report them separately or say they are combined."
 
   takeoff_delay:
     questions: [Q5]
-    definition: "Take-off delay is wheels up minus the scheduled take-off time, for departures, in minutes. Negative means the flight took off early."
+    definition: "Take-off delay is actual take-off (wheels up) minus the scheduled take-off time, for departures, in minutes. Positive means late; negative means early."
     view: v_takeoff_delay
     value_column: delay_min
+    selection: "Departures selected by actual take-off time (selection_time = wheels_up)."
     allowed_groupings: [carrier, runway, aircraft_type, weight_class_icao]
     known_limits:
-      - "No lateness threshold is applied. Early take-offs (negative values) are kept."
+      - "No delay threshold is applied. Early take-offs (negative values) are kept."
+      - "If scheduled take-off is missing, the calculation cannot be completed (exclusion_reason 'missing scheduled take-off'). Never substitute scheduled off-block."
 
   taxiway_usage:
     questions: [Q7]
     definition: "Taxiway usage is the number of distinct flight legs that used each taxiway (e.g. Bravo) or each taxiway section (e.g. Bravo segment 28) to enter or exit the runway or the ramp."
     view: v_taxiway_usage
     value_column: "COUNT(DISTINCT flight_info_id, operation)"
+    selection: "PROVISIONAL PROXY, pending Port confirmation: the export has no per-segment times, so selection_time is departure ramp-side = movement area entrance, departure runway-side = runway entrance, arrival runway-side = runway exit, arrival ramp-side = movement area exit (is_proxy_time = 1)."
     allowed_groupings: [taxiway_name, taxiway_letter, taxiway_segment, segment_number, segment_role, operation, runway]
     segment_codes: "Phonetic alphabet (confirmed by the Port): TaxiwaySegment_B_28 = taxiway Bravo (B), segment 28. By taxiway: group by taxiway_name. By section: group by taxiway_segment."
     taxiway_letters: {A: Alpha, B: Bravo, C: Charlie, D: Delta, E: Echo, F: Foxtrot, G: Golf, J: Juliet, K: Kilo, L: Lima, M: Mike, N: November, P: Papa, Q: Quebec, Z: Zulu}
     known_limits:
+      - "Count each flight once per section, even if the same segment appears in both taxiway fields."
       - "Tango, Hotel and Whiskey do not appear in this data: the export only records the segment used to enter/exit the runway and the ramp, not the full taxi route. Say so if a user asks about them."
       - "Each leg records at most one runway-side and one ramp-side segment."
       - "TaxiwaySegment_B_SSR is on Bravo but has no segment number (segment_number is NULL); its meaning is not yet confirmed."
@@ -102,18 +131,23 @@ metrics:
 
   runway_utilization:
     questions: [Q9]
-    definition: "Runway utilization is the number of SEA take-offs (departures, wheels up) and landings (arrivals, wheels down) on each runway."
+    definition: "Runway utilization is the number of verified SEA take-offs (departures, wheels up) and completed landings (arrivals, wheels down) on each runway."
     view: v_runway_activity
     value_column: "COUNT(*)"
-    allowed_groupings: [runway, activity, local_hour, local_date]
+    selection: "Take-offs by actual take-off, completed landings by wheels down (selection_time = activity_time)."
+    allowed_groupings: [runway, activity, selection_hour, selection_date]
     known_limits:
-      - "Missed approaches are flagged (is_missed_approach = 1) and excluded from take-off and landing counts by default."
+      - "Missed approaches are reported separately (is_missed_approach = 1, exclusion_reason 'missed approach'); they are not completed landings."
+      - "Operations with no runway identifier are excluded from per-runway counts (exclusion_reason 'missing runway')."
+      - "Anything not tagged (FAA) or (SWIM) is SEA local (Port). The exact fields identifying SEA events are still being confirmed."
 
   peak_hours:
     questions: [Q10]
-    definition: "Peak hours are the local hours with the most SEA take-offs and landings."
-    view: v_runway_activity
-    value_column: "COUNT(*)"
-    allowed_groupings: [local_hour, activity, runway]
+    definition: "Peak hours are the local hours with the most SEA take-offs plus completed landings, ranked separately for each local day."
+    view: v_peak_hours
+    value_column: operations
+    selection: "Same as runway_utilization. A runway is not needed for this count."
+    allowed_groupings: [local_date, local_hour]
     known_limits:
+      - "Ranked with RANK() per local_date, so tied hours share a rank. Show the ties."
       - "HISTORY ONLY: one day of data. The system can describe past peaks but cannot predict future congestion."

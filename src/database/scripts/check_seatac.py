@@ -83,6 +83,18 @@ def main():
     hours = rows(cur, "SELECT COUNT(*), MIN(TIMESTAMP(local_date, MAKETIME(local_hour,0,0))), "
                       "MAX(TIMESTAMP(local_date, MAKETIME(local_hour,0,0))) FROM v_movement_area_hourly_peak")[0]
     print(f"   v_movement_area_hourly_peak: {hours[0]} hourly rows, from {hours[1]} to {hours[2]} (values not shown)")
+    used, excl, ex_mt, ex_neg = rows(cur, "SELECT DISTINCT intervals_used, intervals_excluded, excluded_missing_time, "
+                                          "excluded_negative_duration FROM v_movement_area_hourly_peak")[0]
+    print(f"      intervals used {used}, excluded {excl} (missing time {ex_mt}, negative duration {ex_neg})")
+    ph_rows, ph_dates = rows(cur, "SELECT COUNT(*), COUNT(DISTINCT local_date) FROM v_peak_hours")[0]
+    print(f"   v_peak_hours: {ph_rows} hourly rows over {ph_dates} local date(s) (counts and ranks not shown)")
+    print("   v_weight_classes:", ", ".join(f"{g} ({label})" for g, label in
+                                              rows(cur, "SELECT weight_class_group, label FROM v_weight_classes ORDER BY sort_order")))
+
+    print("\n4b. Selection rule effect: rows whose selection_date differs from sea_date")
+    for v in VIEWS:
+        n = rows(cur, f"SELECT COUNT(*) FROM {v} WHERE selection_date <> sea_date")[0][0]
+        print(f"   {v}: {n}")
 
     print("\n5. Our durations vs the export's own (sys_*) columns, included rows with both values")
     print("   difference = ours - sys, in seconds")

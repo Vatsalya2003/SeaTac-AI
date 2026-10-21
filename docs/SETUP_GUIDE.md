@@ -219,7 +219,7 @@ It drops and rebuilds the `seatac` database every time (it never touches `AIplan
 python check_seatac.py
 ```
 
-You should see 1,061 legs (525 arrivals, 535 departures, 1 missed approach), `duplicate (flight_info_id, operation) pairs = 0`, every `sea_date` = 2025-08-08, and every view in `metric_rules.yaml` marked `exists`. The script prints counts and exclusions only, never metric averages. The full expected output is in [DB_SCHEMA.md → check results](DB_SCHEMA.md#check-results-2026-10-19-check_seatacpy).
+You should see 1,061 legs (525 arrivals, 535 departures, 1 missed approach), `duplicate (flight_info_id, operation) pairs = 0`, every `sea_date` = 2025-08-08, and every view in `metric_rules.yaml` marked `exists`. The script prints counts and exclusions only, never metric averages. The full expected output is in [DB_SCHEMA.md → check results](DB_SCHEMA.md#check-results-2026-10-21-check_seatacpy).
 
 **Baseline database:** `build_aiplane_v2.py` builds `AIplane_v2`, the new data in Team 6's old table layout, for testing the unchanged chatbot (see Step 7).
 

@@ -173,19 +173,22 @@ Defined in [`src/database/sql/seatac_views.sql`](../src/database/sql/seatac_view
 **Every view has:**
 - `exclusion_reason`: NULL means the row is used. `'missing time'` means the start or end is NULL. `'negative duration'` means end < start (**except `v_takeoff_delay`**, where negative = early and is kept).
 - `included`: 1 when `exclusion_reason` is NULL.
+- `selection_time`, `selection_date`, `selection_hour`: the timestamp the confirmed selection rule uses to place the row in a reporting window (local). **Filter windows on these, not on `sea_date`**: windows include the start and exclude the end.
 
-Two extra reasons exist where there is no time to be missing: `'missing segment'` in `v_taxiway_usage` and `'missed approach'` in `v_runway_activity`.
+View-specific reasons: `'missing scheduled take-off'` / `'missing take-off'` (`v_takeoff_delay`: the calculation cannot be completed), `'missing segment'` (`v_taxiway_usage`), `'missed approach'` and `'missing runway'` (`v_runway_activity`). No view has an upper cutoff or a minimum group size; zero and very long durations are kept. The helper views `v_movement_area_hourly_peak`, `v_peak_hours` and `v_weight_classes` have no per-row exclusions.
 
-| View | Question(s) | Rows | Start → end | Unit |
+| View | Question(s) | Rows | Start → end (and selection rule) | Unit |
 |---|---|---|---|---|
-| `v_taxi_in` | Q1, Q6, Q8 | arrivals | `wheels_down` → `actual_in_block` | minutes |
-| `v_taxi_out` | Q2, Q6 | departures | `actual_off_block` (Aerobahn, confirmed by the Port) → `wheels_up` (plus local date and hour of off-block) | minutes |
-| `v_movement_area` | Q3 | arrivals + departures | arr: `wheels_down` → `movement_area_exit`; dep: `movement_area_entrance` → `wheels_up` | minutes |
-| `v_movement_area_hourly_peak` | Q3 | one row per local hour | Maximum number of aircraft in the movement area at the same time (sweep over included `v_movement_area` intervals; exits counted before entries at the same second) | count |
-| `v_runway_occupancy` | Q4 | arrivals + departures | arr: `wheels_down` → `runway_exit`; dep: `runway_entrance` → `wheels_up` | seconds |
-| `v_takeoff_delay` | Q5 | departures | `scheduled_take_off` → `wheels_up`, no threshold, negative = early | minutes |
-| `v_taxiway_usage` | Q7 | 2 rows per leg (runway-side + ramp-side segment) | count DISTINCT (`flight_info_id`, `operation`) per `taxiway_name` (by taxiway) or per `taxiway_segment` (by section). Decoded columns: `taxiway_letter` (e.g. `B`), `taxiway_name` (e.g. `Bravo`), `segment_number` (e.g. `28`) | legs |
-| `v_runway_activity` | Q9, Q10 | one row per leg | Take-off at `wheels_up` (dep), landing at `wheels_down` (arr), with runway, local date and hour. The missed approach is flagged (`is_missed_approach`) at `sea_event_time` and excluded by default | count |
+| `v_taxi_in` | Q1, Q6, Q8 | arrivals | `wheels_down` → `actual_in_block` Selected by wheels-down. | minutes  |
+| `v_taxi_out` | Q2, Q6 | departures | `actual_off_block` (Aerobahn, confirmed by the Port) → `wheels_up` (plus local date and hour of off-block) Selected by off-block (7 departures push back on Aug 7). | minutes  |
+| `v_movement_area` | Q3 | arrivals + departures | arr: `wheels_down` → `movement_area_exit`; dep: `movement_area_entrance` → `wheels_up` Intervals overlapping the window count. | minutes  |
+| `v_movement_area_hourly_peak` | Q3 | one row per local hour | Maximum number of aircraft in the movement area at the same time (sweep over included `v_movement_area` intervals; exits counted before entries at the same second) Also returns `intervals_used`, `intervals_excluded`, `excluded_missing_time`, `excluded_negative_duration` (whole-dataset counts) so exclusions can be reported | count |
+| `v_runway_occupancy` | Q4 | arrivals + departures | arr: `wheels_down` → `runway_exit`; dep: `runway_entrance` → `wheels_up` Selected by interval start (touchdown / runway entry). | seconds  |
+| `v_takeoff_delay` | Q5 | departures | `scheduled_take_off` → `wheels_up`, no threshold, negative = early Selected by actual take-off. | minutes  |
+| `v_taxiway_usage` | Q7 | 2 rows per leg (runway-side + ramp-side segment) | count DISTINCT (`flight_info_id`, `operation`) per `taxiway_name` (by taxiway) or per `taxiway_segment` (by section). Decoded columns: `taxiway_letter` (e.g. `B`), `taxiway_name` (e.g. `Bravo`), `segment_number` (e.g. `28`) Selected by a **provisional proxy** section-entry time (`is_proxy_time` = 1; see decisions below). | legs  |
+| `v_runway_activity` | Q9 | one row per leg | Take-off at `wheels_up` (dep), landing at `wheels_down` (arr), with runway, local date and hour. The missed approach is flagged (`is_missed_approach`) at `sea_event_time` and excluded by default Q9 only; `'missing runway'` excluded from per-runway counts. | count  |
+| `v_peak_hours` | Q10 | one row per local hour with activity | Take-offs + completed landings per local hour (`operations`, `takeoffs`, `landings`), ranked per local date with `RANK()` (`hour_rank`; ties share a rank). Missed approaches not counted; a runway isn't required | count |
+| `v_weight_classes` | Q6 | 4 fixed rows | L (Light), M (Medium), H (Heavy), Unknown. LEFT JOIN on `weight_class_group` (in `v_taxi_in` / `v_taxi_out`, NULL → `'Unknown'`) so empty groups show "No data", never 0 | — |
 
 ### Definition decisions and pending items
 
@@ -193,14 +196,14 @@ Two extra reasons exist where there is no time to be missing: `'missing segment'
 |---|---|
 | **Q4 runway occupancy** | **Follows Samer's definition on purpose.** It starts at touchdown (`wheels_down`) for arrivals and ends at `wheels_up` for departures, with **no "Clear Active"**. The export's own `Runway Occupancy Time` is defined differently: **arrivals CrossThreshold → Runway Exit** (matches within 1 s on all 521) and **departures Runway Entrance → Clear Active** (within 1 s on all 532). So our values are systematically shorter than the export's, and that is expected |
 | **Q2 taxi-out off-block source** | **Confirmed by the Port: Aerobahn.** The view uses Aerobahn off-block (no change). The export's own `Actual Taxi Out Time` is built from **AODB off-block → ATC take-off** (mean difference +9 s, all within 60 s). Aerobahn off-block is consistently later, so ours is shorter on 530 of 533 legs, which is expected |
-| **Q3 movement-area boundary** | **PENDING PORT CONFIRMATION:** whether runway time counts as movement-area time (arrivals start at touchdown, departures end at wheels up) |
-| **Q7 taxiway names** | **Confirmed by the Port: phonetic alphabet.** `TaxiwaySegment_B_28` = taxiway Bravo, segment 28. `v_taxiway_usage` adds `taxiway_letter`, `taxiway_name` and `segment_number`. Letters in the data: A, B, C, D, E, F, G, J, K, L, M, N, P, Q, Z (all mapped). **Tango, Hotel and Whiskey don't appear**: the export records only the one segment used to enter/exit the runway and the one for the ramp, not the whole route. One code, `TaxiwaySegment_B_SSR`, is on Bravo but has no segment number (`segment_number` NULL; meaning not confirmed). Selecting by section-entry time is still not possible (no per-segment times in the export) |
+| **Q3 movement-area boundary** | **Runway time counts (confirmed by the Port):** arrivals from touchdown, departures until take-off. **PENDING:** mapping Aerobahn's Movement Area Entrance/Exit events to the client's hatched-area boundary. **Limit:** one entrance/exit pair per leg, so an exit and re-entry within a leg isn't visible (0 overlapping intervals for the same flight or aircraft) |
+| **Q7 taxiway names** | **Confirmed by the Port: phonetic alphabet.** `TaxiwaySegment_B_28` = taxiway Bravo, segment 28. `v_taxiway_usage` adds `taxiway_letter`, `taxiway_name` and `segment_number`. Letters in the data: A, B, C, D, E, F, G, J, K, L, M, N, P, Q, Z (all mapped). **Tango, Hotel and Whiskey don't appear**: the export records only the one segment used to enter/exit the runway and the one for the ramp, not the whole route. One code, `TaxiwaySegment_B_SSR`, is on Bravo but has no segment number (`segment_number` NULL; meaning not confirmed). **Section-entry time (PENDING PORT):** the export has no per-segment times, so `selection_time` is a provisional proxy: departure ramp-side = movement-area entrance, departure runway-side = runway entrance, arrival runway-side = runway exit, arrival ramp-side = movement-area exit |
 | **Q10 peak hours** | **History only.** One day of data, no forecasting |
 | **Taxi-in source** | Uses Aerobahn in-block, which agrees with Surveillance in-block. The export's own taxi-in uses **AODB in-block**. Of the 3 legs that differ by more than 5 minutes, 2 are AODB in-block running 8–10 min later than Surveillance, and 1 (QTA3199) has an Aerobahn in-block 99 min after touchdown with no other source to confirm it. That leg is currently **included** |
 
 ---
 
-## Check results (2026-10-19, `check_seatac.py`)
+## Check results (2026-10-21, `check_seatac.py`)
 
 Counts and differences only. **Metric averages are deliberately not shown**: the team computes expected answers independently.
 
@@ -212,12 +215,14 @@ Counts and differences only. **Metric averages are deliberately not shown**: the
 | v_taxi_out | 535 | 535 | — |
 | v_movement_area | 1,060 | 1,052 | missing time 8 (arr 5, dep 3) |
 | v_runway_occupancy | 1,060 | 1,054 | missing time 6 (arr 4, dep 2) |
-| v_takeoff_delay | 535 | 533 | missing time 2 |
-| v_taxiway_usage | 2,120 | 2,103 | missing segment 17 |
-| v_runway_activity | 1,061 | 1,060 | missed approach 1 |
-| v_movement_area_hourly_peak | 25 hourly rows (2025-08-07 23:00 – 2025-08-08 23:00) | — | — |
+| v_takeoff_delay | 535 | 533 | missing scheduled take-off 2 |
+| v_taxiway_usage | 2,120 | 2,102 | missing segment 17, missing (proxy) time 1 |
+| v_runway_activity | 1,061 | 1,059 | missed approach 1, missing runway 1 (QTA2016) |
+| v_movement_area_hourly_peak | 25 hourly rows (2025-08-07 23:00 – 2025-08-08 23:00) | intervals used 1,052 | intervals excluded 8 (missing time) |
+| v_peak_hours | 23 hourly rows, 1 local date | — | — (counts and ranks not shown) |
+| v_weight_classes | 4 rows (L, M, H, Unknown) | — | — |
 
-No view has any negative durations.
+No view has any negative durations. **Selection-date effect** (rows whose `selection_date` differs from `sea_date`): v_taxi_out 7, v_movement_area 4, v_taxiway_usage 5, v_runway_occupancy 1, the others 0.
 
 **Our durations vs the export's own (`sys_*`), ours − export, included rows:**
 
