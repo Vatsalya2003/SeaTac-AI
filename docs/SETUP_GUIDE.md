@@ -5,7 +5,7 @@
 > A step-by-step guide to get the app running locally. It takes about 15 minutes.
 > Background: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) · How the code works: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · Database: [DB_SCHEMA.md](DB_SCHEMA.md)
 >
-> **Tested on 2026-10-01** on macOS (Apple Silicon) with MySQL 8.4.8, Python 3.12 and Node 22. The installs, the backend start and the frontend start all worked. **Baseline steps (Step 7) checked on 2026-10-20**: `build_aiplane_v2.py` output (1,061 flights, 11,975 events), the backend with Gemini (`gemini-2.5-flash`) connected to `AIplane_v2` (`/api/health` online), and the frontend loading. Windows steps are written out but **⚠️ not tested yet**; if you're on Windows, please fix anything that's wrong.
+> **Tested on 2026-10-01** on macOS (Apple Silicon) with MySQL 8.4.8, Python 3.12 and Node 22. The installs, the backend start and the frontend start all worked. **Baseline steps (Step 7) checked on 2026-10-20**: `build_aiplane_v2.py` output (1,061 flights, 11,975 events), the backend with Gemini (`gemini-2.5-flash`) connected to `AIplane_v2` (`/api/health` online), and the frontend loading. **Google shut down `gemini-2.5-flash` on 2026-10-16**; the default is now `gemini-3.6-flash`, which hasn't been re-tested here yet. Windows steps are written out but **⚠️ not tested yet**; if you're on Windows, please fix anything that's wrong.
 
 ---
 
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 ```env
 LLM_PROVIDER=gemini
 GEMINI_API_KEY=...your own key from aistudio.google.com...
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.6-flash
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -142,14 +142,14 @@ uvicorn app_optimized:app --reload --port 8000
 **Check it:** open http://localhost:8000/api/health. With Option A (Gemini) you should see:
 
 ```json
-{"status":"healthy","model":"gemini-2.5-flash","modal_enabled":false,"modal_endpoint":null,"claude_enabled":true,"database_status":"online","version":"8.0.0"}
+{"status":"healthy","model":"gemini-3.6-flash","modal_enabled":false,"modal_endpoint":null,"claude_enabled":true,"database_status":"online","version":"8.0.0"}
 ```
 
 - **`"database_status": "online"`** means MySQL is connected.
 - **`"claude_enabled": true`** means an AI key is configured. The field has an old name: it's `true` for Gemini too.
-- **`"model"`** shows the model actually in use (`gemini-2.5-flash`, or the Claude model with Option B).
+- **`"model"`** shows the model actually in use (`gemini-3.6-flash`, or the Claude model with Option B). `/api/health` doesn't call Gemini, so it can't tell you whether the model is still available: ask one question to check.
 
-The terminal also prints `🤖 LLM provider: gemini ✅` and `Model: gemini-2.5-flash` at startup. If it prints `LLM provider 'gemini': NOT CONFIGURED (missing API key) ❌`, the key is missing (see Troubleshooting).
+The terminal also prints `🤖 LLM provider: gemini ✅` and `Model: gemini-3.6-flash` at startup. If it prints `LLM provider 'gemini': NOT CONFIGURED (missing API key) ❌`, the key is missing (see Troubleshooting).
 
 ---
 
@@ -249,14 +249,14 @@ We test the **unchanged** chatbot on the Port's new data to get our "before" sco
    ```
    (The next lines report 3 `UNKNOWN_###` aircraft types covering 238 flights; that's expected.)
 3. In `src/backend/.env`, set `DB_NAME=AIplane_v2`, `LLM_PROVIDER=gemini`,
-   `GEMINI_API_KEY=` (your own free key) and `GEMINI_MODEL=gemini-2.5-flash`.
-   Everyone must use the same model so results are comparable.
+   `GEMINI_API_KEY=` (your own free key) and `GEMINI_MODEL=gemini-3.6-flash`.
+   Everyone must use the same model so results are comparable. (Baseline runs before 2026-10-16 used `gemini-2.5-flash`, which Google has shut down; note the model in your results.)
 4. Start the backend and save its output (it shows the SQL for each question):
    ```bash
    cd SeaTac-AI/src/backend && source venv/bin/activate
    mkdir -p logs && PYTHONUNBUFFERED=1 uvicorn app_optimized:app --port 8000 2>&1 | tee logs/baseline_backend.log
    ```
-   `PYTHONUNBUFFERED=1` is required: without it, Python holds the printed SQL in a buffer when output goes through `tee`, so it reaches the log late, or is lost when you stop the server. Check `/api/health` shows `"model":"gemini-2.5-flash"` and `"database_status":"online"`.
+   `PYTHONUNBUFFERED=1` is required: without it, Python holds the printed SQL in a buffer when output goes through `tee`, so it reaches the log late, or is lost when you stop the server. Check `/api/health` shows `"model":"gemini-3.6-flash"` and `"database_status":"online"`.
    Windows (PowerShell): `$env:PYTHONUNBUFFERED=1; uvicorn app_optimized:app --port 8000 2>&1 | Tee-Object logs\baseline_backend.log`
 5. Start the frontend (Step 4) and type each question **exactly** as written in the test
    spreadsheet. Don't avoid the known-bug questions; they're part of the test.
@@ -299,6 +299,7 @@ Stop either server with **Ctrl + C**.
 | Every question shows `HTTP 500: {"detail":"Error: 503: No SQL generator configured"}` (Claude) | `CLAUDE_API_KEY` is missing from `src/backend/.env`. Add it and restart the backend |
 | Same `HTTP 500 … No SQL generator configured` message with Gemini; the startup log says `LLM provider 'gemini': NOT CONFIGURED (missing API key) ❌`, and `/api/health` shows `"claude_enabled": false` | `GEMINI_API_KEY` is missing (or empty) while `LLM_PROVIDER=gemini`. Add your key and restart the backend |
 | Backend won't start: `ModuleNotFoundError: No module named 'google'` | The Gemini package isn't installed. Run `pip install -r requirements.txt` in the `src/backend` venv (you need the `test_1` version of the file) |
+| Answers look random (`Found 10 results.`) or greetings are canned, and the log shows `SQL generation error: 404 NOT_FOUND …` saying the model is **no longer available** (`/api/health` still says healthy, because it never calls Gemini) | The Gemini model has been shut down. `gemini-2.5-flash` was retired on 2026-10-16. Pull `test_1` (the default is now `gemini-3.6-flash`) and set `GEMINI_MODEL=gemini-3.6-flash` in `src/backend/.env`, or delete that line to use the default. A `GEMINI_MODEL` line left at the old model overrides the new default. Restart the backend |
 | Answers look random (`Found 10 results.`) and the log shows `SQL generation error` | The AI call failed: a wrong or expired key, a Gemini "high demand" 503, or the free-tier limit. Check the log line, wait, and ask again |
 | Questions return an authentication error | The Claude key is wrong or expired, or it's still a placeholder |
 | `pip install` fails building `pydantic-core` | Your Python is too new. Recreate the venv with Python 3.12 (Step 3) |

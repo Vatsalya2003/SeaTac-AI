@@ -19,7 +19,7 @@ These are the versions installed and running on our machine, including our uncom
 | Backend | Python + FastAPI + Uvicorn + Pydantic | Python 3.12 · FastAPI 0.109.0 · Uvicorn 0.27.0 · Pydantic 2.13.5 |
 | Database | MySQL (driver: mysql-connector-python). Chatbot → `AIplane`; new Port data → `seatac` | MySQL 8.4.8 · connector 8.2.0 |
 | Data loading | `src/database` scripts: pandas + openpyxl (read the export), PyMySQL (write), python-dotenv, PyYAML | pandas 3.0.6 · openpyxl 3.1.5 · PyMySQL 1.2.3 · python-dotenv 1.2.4 · PyYAML 6.0.3 (Python 3.12, own venv) |
-| AI, active | **Google Gemini** via `google-genai` (`LLM_PROVIDER=gemini`) | `gemini-2.5-flash` · google-genai 2.27 |
+| AI, active | **Google Gemini** via `google-genai` (`LLM_PROVIDER=gemini`) | `gemini-3.6-flash` (default since 2026-10-21; `gemini-2.5-flash` was shut down by Google on 2026-10-16) · google-genai 2.29 |
 | AI, available | Anthropic Claude via `anthropic` (set `LLM_PROVIDER=claude`; needs API credit) | `claude-sonnet-4-20250514` (deprecated model; see §4) · anthropic 0.125.0 |
 | AI, off | Fine-tuned CodeLlama-7B on Modal | not used |
 

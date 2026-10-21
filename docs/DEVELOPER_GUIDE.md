@@ -115,7 +115,7 @@ DB_NAME=AIplane                        # default AIplane; must match the case th
 ```env
 LLM_PROVIDER=gemini                  # default is claude
 GEMINI_API_KEY=...                   # from aistudio.google.com
-GEMINI_MODEL=gemini-2.5-flash        # optional; this is the default. Check it's still offered
+GEMINI_MODEL=gemini-3.6-flash        # optional; this is the default (gemini-2.5-flash was shut down 2026-10-16)
 ```
 
 - A small `GeminiClient` adapter in `app_optimized.py` mimics `client.messages.create(...)`, so the three call sites (greeting, SQL, summary) didn't change. It also needs `google-genai` (now in `requirements.txt`).

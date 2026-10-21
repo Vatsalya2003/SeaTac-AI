@@ -62,7 +62,7 @@ CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-20250514')  # Latest f
 # LLM provider: "claude" (default) or "gemini"
 LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'claude').strip().lower()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')
 
 # ============================================================================
 # MODAL DISABLED FOR SPEED - SET TO True TO RE-ENABLE
