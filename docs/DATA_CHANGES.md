@@ -47,7 +47,7 @@
 |---|---|
 | One operating day only | Yes (2025-08-08). Q10 "peak hour prediction" stays history-only |
 | No light aircraft | Yes: only `M` and `H` weight classes |
-| Taxiway names (Tango/Hotel/Whiskey) | Still only segment codes (15 runway-side and 16 ramp-side values); the mapping is pending |
+| Taxiway names (Tango/Hotel/Whiskey) | Segment codes are now decoded (the Port confirmed the phonetic alphabet: `TaxiwaySegment_B_28` = Bravo, segment 28). But **Tango, Hotel and Whiskey still don't appear**, because the export records only the entry/exit segment for the runway and the ramp (15 runway-side and 16 ramp-side codes) |
 | Other-airport times exist in the export | Yes, in `raw_flight_details` (e.g. arrivals' origin off-block). `flights` and the views don't use them |
 | The export's own durations use other sources | The export's taxi-in and taxi-out use **AODB** gate times, and its runway occupancy uses **CrossThreshold / Clear Active**. See [DB_SCHEMA.md → definition decisions](DB_SCHEMA.md#definition-decisions-and-pending-items) |
 
@@ -56,7 +56,8 @@
 - **Missed approach:** 1 row with `operation = 'Missed Approach'`. Its `flight_info_id` is shared with an arrival. It follows the arrival rule for SEA-side times and is flagged and excluded in `v_runway_activity`.
 - **E75L variant conflict:** about 93 of 340 E75L legs carry a different wake category and wingspan, likely two E175 variants under one code ([details](DB_SCHEMA.md#2b-aircraft_types--one-row-per-faa-type)).
 - **QTA3199 taxi-in:** an Aerobahn in-block time 99 minutes after touchdown with no second source. It is currently included in taxi-in.
-- **Pending Port confirmation:** the Q2 taxi-out off-block source (Aerobahn vs AODB) and the Q3 movement-area boundary.
+- **Confirmed by the Port (2026-10-21):** the Q2 off-block source is **Aerobahn**, and the Q7 segment codes use the **phonetic alphabet**.
+- **Still pending Port confirmation:** the Q3 movement-area boundary mapping, and the meaning of the code `TaxiwaySegment_B_SSR`.
 
 ## Baseline database: `AIplane_v2`
 

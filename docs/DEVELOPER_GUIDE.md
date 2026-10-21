@@ -395,7 +395,7 @@ Ordered by severity within each group. **(Verified)** means we reproduced it by 
 4. **Which spreadsheet did Jo import with the ramp changes, and why isn't the regenerated data committed?**
 5. **Runway events:** does the Port confirm that the export only records runway entry for departures and exit for arrivals ([Team 6 schema issue 4](legacy/DB_SCHEMA_TEAM6.md#known-schema-issues))? What's the correct runway-occupancy formula? ✅ **Answered:** it's structural (entry recorded for departures, exit for arrivals), and Samer confirmed per-operation definitions; see [DATA_CHANGES.md](DATA_CHANGES.md).
 6. **Duplicate call signs:** are the 10 same-operation duplicates real (e.g. two flights reusing a call sign), or import errors?
-7. **Taxiway names:** how do segment codes like `TaxiwaySegment_B_28` map to the "Tango, Hotel, Whiskey" taxiways in the user story?
+7. **Taxiway names:** how do segment codes like `TaxiwaySegment_B_28` map to the "Tango, Hotel, Whiskey" taxiways in the user story? ✅ **Answered (2026-10-21):** the phonetic alphabet (`B_28` = Bravo, segment 28), decoded in `v_taxiway_usage`. Tango, Hotel and Whiskey don't appear because the export records only entry/exit segments.
 8. **Is the desktop (Electron) app still a requirement?**
 9. **Why did the Spring team switch from Gemma 2-2B to CodeLlama-7B, and from the keyword-classifier plan to pure Claude?** Neither decision is documented ([TECH_STACK.md §4](TECH_STACK.md#4-ai--model-layer)).
 10. **Data access:** will we get more than one day of data, or live AerobahnDW access, for real-time and prediction features?

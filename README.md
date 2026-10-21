@@ -21,7 +21,7 @@ This project lets leaders ask those questions in plain English. The goal for thi
 | Chatbot (web app + API) | Runs locally on the previous cohort’s database (`AIplane`). Not yet switched to the new views |
 | New database (`seatac`) | Built from the Port’s updated export: raw table, clean `flights` table, `aircraft_types` and 7 metric views (plus one helper view) |
 | Baseline database (`AIplane_v2`) | The new data in the previous cohort’s table layout, so the unchanged chatbot can be tested fairly |
-| Question definitions | Confirmed by the Port for all 10 priority questions; Q2 off-block source and Q3 boundary still pending |
+| Question definitions | Confirmed by the Port for all 10 priority questions; Q3 boundary and Q7 details (section-entry timing, Tango/Hotel/Whiskey, `B_SSR`) still pending |
 | Expected answers | Being calculated by hand by the team |
 | Accuracy testing | Not started; baseline run next |
 
@@ -150,7 +150,7 @@ This is the third generation of the project. Each cohort built on the one before
 ### Fall 2026: Team 2 (current)
 
 - **Starting point:** forked from Team 6’s repository and documented the inherited code and data (see [docs/](docs/)).
-- **Definitions:** the Port confirmed definitions for the 10 priority questions (Q2, Q3 and Q7 details still pending).
+- **Definitions:** the Port confirmed definitions for the 10 priority questions (Q3 and Q7 details still pending).
 - **New data:** the Port provided an updated, more complete export (1,061 flight legs vs 725 in the old sample). We built a new database around it, with the definitions in metric views.
 - **This term’s focus:** answer accuracy, honest limits when data is missing, and a measured before/after comparison.
 

@@ -147,26 +147,44 @@ FROM flights f
 WHERE f.operation = 'Departure';
 
 -- Q7 - taxiway usage: one row per flight leg per taxiway segment field (runway-side and ramp-side).
--- Count DISTINCT (flight_info_id, operation) per taxiway_segment. Arrivals and departures only.
--- 'missing segment' = the taxiway field is empty for that leg. Taxiway names (e.g. Tango/Hotel/Whiskey) are pending.
+-- Count DISTINCT (flight_info_id, operation) per taxiway_segment (a section) or per taxiway_name (a taxiway).
+-- Arrivals and departures only. 'missing segment' = the taxiway field is empty for that leg.
+-- Segment codes use the phonetic alphabet (confirmed by the Port): TaxiwaySegment_B_28 = taxiway Bravo, segment 28.
+-- segment_number is NULL when the part after the letter is not a number (e.g. TaxiwaySegment_B_SSR).
+-- Tango, Hotel and Whiskey never appear: the export only records the segment used to enter/exit the runway and ramp.
 CREATE OR REPLACE VIEW v_taxiway_usage AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
-  'runway' AS segment_role,
-  f.taxiway_runway AS taxiway_segment,
-  CASE WHEN f.taxiway_runway IS NULL THEN 'missing segment' END AS exclusion_reason,
-  (f.taxiway_runway IS NOT NULL) AS included
-FROM flights f
-WHERE f.operation IN ('Arrival', 'Departure')
-UNION ALL
-SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
-  'ramp',
-  f.taxiway_ramp,
-  CASE WHEN f.taxiway_ramp IS NULL THEN 'missing segment' END,
-  (f.taxiway_ramp IS NOT NULL)
-FROM flights f
-WHERE f.operation IN ('Arrival', 'Departure');
+  u.*,
+  CASE WHEN u.taxiway_segment REGEXP '^TaxiwaySegment_[A-Z]_'
+       THEN SUBSTRING(u.taxiway_segment, 16, 1) END AS taxiway_letter,
+  CASE WHEN u.taxiway_segment REGEXP '^TaxiwaySegment_[A-Z]_' THEN
+    CASE SUBSTRING(u.taxiway_segment, 16, 1)
+       WHEN 'A' THEN 'Alpha'   WHEN 'B' THEN 'Bravo'  WHEN 'C' THEN 'Charlie' WHEN 'D' THEN 'Delta'
+       WHEN 'E' THEN 'Echo'    WHEN 'F' THEN 'Foxtrot' WHEN 'G' THEN 'Golf'   WHEN 'J' THEN 'Juliet'
+       WHEN 'K' THEN 'Kilo'    WHEN 'L' THEN 'Lima'   WHEN 'M' THEN 'Mike'    WHEN 'N' THEN 'November'
+       WHEN 'P' THEN 'Papa'    WHEN 'Q' THEN 'Quebec' WHEN 'Z' THEN 'Zulu' END
+  END AS taxiway_name,
+  CASE WHEN u.taxiway_segment REGEXP '^TaxiwaySegment_[A-Z]_[0-9]+$'
+       THEN CAST(SUBSTRING_INDEX(u.taxiway_segment, '_', -1) AS UNSIGNED) END AS segment_number
+FROM (
+  SELECT
+    f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+    'runway' AS segment_role,
+    f.taxiway_runway AS taxiway_segment,
+    CASE WHEN f.taxiway_runway IS NULL THEN 'missing segment' END AS exclusion_reason,
+    (f.taxiway_runway IS NOT NULL) AS included
+  FROM flights f
+  WHERE f.operation IN ('Arrival', 'Departure')
+  UNION ALL
+  SELECT
+    f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+    'ramp',
+    f.taxiway_ramp,
+    CASE WHEN f.taxiway_ramp IS NULL THEN 'missing segment' END,
+    (f.taxiway_ramp IS NOT NULL)
+  FROM flights f
+  WHERE f.operation IN ('Arrival', 'Departure')
+) u;
 
 -- Q9, Q10 - runway activity: one row per SEA take-off (departure, wheels up) or landing (arrival, wheels down).
 -- Missed approaches are flagged (is_missed_approach = 1) and excluded from take-off/landing counts by default

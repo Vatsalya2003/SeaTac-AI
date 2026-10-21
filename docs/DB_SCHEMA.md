@@ -109,7 +109,7 @@ erDiagram
 | `runway` | VARCHAR(10) | Runway | SEA runway used (16L/16C/16R/34L/34C/34R) | 525 / 534 / 1 |
 | `gate` | VARCHAR(30) | Gate Assigned (Aerobahn) | SEA gate. **88 distinct gates** + the placeholder `*ASCG1S` | all |
 | `parking_area` | VARCHAR(50) | Parking Area | Ramp area at SEA | 521 / 534 / 1 |
-| `taxiway_runway` | VARCHAR(50) | Taxiway Used to Enter/Exit Runway | One taxiway segment code (e.g. `TaxiwaySegment_B_28`) | 521 / 534 / 0 |
+| `taxiway_runway` | VARCHAR(50) | Taxiway Used to Enter/Exit Runway | One taxiway segment code, e.g. `TaxiwaySegment_B_28` = taxiway **Bravo**, segment 28 (decoded in `v_taxiway_usage`) | 521 / 534 / 0 |
 | `taxiway_ramp` | VARCHAR(50) | Taxiway Used to Enter/Exit Ramp | One taxiway segment code | 520 / 528 / 0 |
 | `scheduled_off_block` | DATETIME | Scheduled Off Block Time (Aerobahn) (PDT) | Planned pushback at SEA | 0 / 535 / 0 |
 | `actual_off_block` | DATETIME | Actual Off Block Time (Aerobahn) (PDT) | Actual pushback at SEA | 0 / 535 / 0 |
@@ -179,12 +179,12 @@ Two extra reasons exist where there is no time to be missing: `'missing segment'
 | View | Question(s) | Rows | Start → end | Unit |
 |---|---|---|---|---|
 | `v_taxi_in` | Q1, Q6, Q8 | arrivals | `wheels_down` → `actual_in_block` | minutes |
-| `v_taxi_out` | Q2, Q6 | departures | `actual_off_block` → `wheels_up` (plus local date and hour of off-block) | minutes |
+| `v_taxi_out` | Q2, Q6 | departures | `actual_off_block` (Aerobahn, confirmed by the Port) → `wheels_up` (plus local date and hour of off-block) | minutes |
 | `v_movement_area` | Q3 | arrivals + departures | arr: `wheels_down` → `movement_area_exit`; dep: `movement_area_entrance` → `wheels_up` | minutes |
 | `v_movement_area_hourly_peak` | Q3 | one row per local hour | Maximum number of aircraft in the movement area at the same time (sweep over included `v_movement_area` intervals; exits counted before entries at the same second) | count |
 | `v_runway_occupancy` | Q4 | arrivals + departures | arr: `wheels_down` → `runway_exit`; dep: `runway_entrance` → `wheels_up` | seconds |
 | `v_takeoff_delay` | Q5 | departures | `scheduled_take_off` → `wheels_up`, no threshold, negative = early | minutes |
-| `v_taxiway_usage` | Q7 | 2 rows per leg (runway-side + ramp-side segment) | count DISTINCT (`flight_info_id`, `operation`) per `taxiway_segment` | legs |
+| `v_taxiway_usage` | Q7 | 2 rows per leg (runway-side + ramp-side segment) | count DISTINCT (`flight_info_id`, `operation`) per `taxiway_name` (by taxiway) or per `taxiway_segment` (by section). Decoded columns: `taxiway_letter` (e.g. `B`), `taxiway_name` (e.g. `Bravo`), `segment_number` (e.g. `28`) | legs |
 | `v_runway_activity` | Q9, Q10 | one row per leg | Take-off at `wheels_up` (dep), landing at `wheels_down` (arr), with runway, local date and hour. The missed approach is flagged (`is_missed_approach`) at `sea_event_time` and excluded by default | count |
 
 ### Definition decisions and pending items
@@ -192,9 +192,9 @@ Two extra reasons exist where there is no time to be missing: `'missing segment'
 | Item | Status |
 |---|---|
 | **Q4 runway occupancy** | **Follows Samer's definition on purpose.** It starts at touchdown (`wheels_down`) for arrivals and ends at `wheels_up` for departures, with **no "Clear Active"**. The export's own `Runway Occupancy Time` is defined differently: **arrivals CrossThreshold → Runway Exit** (matches within 1 s on all 521) and **departures Runway Entrance → Clear Active** (within 1 s on all 532). So our values are systematically shorter than the export's, and that is expected |
-| **Q2 taxi-out off-block source** | **PENDING PORT CONFIRMATION.** We use **Aerobahn** off-block. The export's own `Actual Taxi Out Time` reproduces from **AODB off-block → ATC take-off** (mean difference +9 s, all within 60 s). Aerobahn off-block is consistently later, so ours is shorter on 530 of 533 legs |
+| **Q2 taxi-out off-block source** | **Confirmed by the Port: Aerobahn.** The view uses Aerobahn off-block (no change). The export's own `Actual Taxi Out Time` is built from **AODB off-block → ATC take-off** (mean difference +9 s, all within 60 s). Aerobahn off-block is consistently later, so ours is shorter on 530 of 533 legs, which is expected |
 | **Q3 movement-area boundary** | **PENDING PORT CONFIRMATION:** whether runway time counts as movement-area time (arrivals start at touchdown, departures end at wheels up) |
-| **Q7 taxiway names** | **PENDING:** how segment codes map to names like Tango, Hotel and Whiskey. Each leg records only one runway-side and one ramp-side segment, not the whole route |
+| **Q7 taxiway names** | **Confirmed by the Port: phonetic alphabet.** `TaxiwaySegment_B_28` = taxiway Bravo, segment 28. `v_taxiway_usage` adds `taxiway_letter`, `taxiway_name` and `segment_number`. Letters in the data: A, B, C, D, E, F, G, J, K, L, M, N, P, Q, Z (all mapped). **Tango, Hotel and Whiskey don't appear**: the export records only the one segment used to enter/exit the runway and the one for the ramp, not the whole route. One code, `TaxiwaySegment_B_SSR`, is on Bravo but has no segment number (`segment_number` NULL; meaning not confirmed). Selecting by section-entry time is still not possible (no per-segment times in the export) |
 | **Q10 peak hours** | **History only.** One day of data, no forecasting |
 | **Taxi-in source** | Uses Aerobahn in-block, which agrees with Surveillance in-block. The export's own taxi-in uses **AODB in-block**. Of the 3 legs that differ by more than 5 minutes, 2 are AODB in-block running 8–10 min later than Surveillance, and 1 (QTA3199) has an Aerobahn in-block 99 min after touchdown with no other source to confirm it. That leg is currently **included** |
 
@@ -224,7 +224,7 @@ No view has any negative durations.
 | Metric | n | Mean diff | Max \|diff\| | Within 60 s | Explanation |
 |---|---|---|---|---|---|
 | taxi-in | 524 | −30 s | 5,460 s | 371 | The export rounds to whole minutes and uses AODB in-block. 3 outliers > 300 s (see above) |
-| taxi-out | 533 | −370 s | 1,778 s | 17 | Different off-block source (Aerobahn vs AODB); pending Port |
+| taxi-out | 533 | −370 s | 1,778 s | 17 | Different off-block source on purpose: ours is Aerobahn (confirmed by the Port), the export's is AODB |
 | runway occupancy | 1,053 | −29 s | 50 s | 1,053 | Different definition on purpose (Samer's): touchdown and wheels-up instead of CrossThreshold and Clear Active |
 
 **Old vs new:** see [DATA_CHANGES.md](DATA_CHANGES.md) (719 of the 725 old legs match a new row).

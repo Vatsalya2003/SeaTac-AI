@@ -43,8 +43,10 @@ metrics:
     view: v_taxi_out
     value_column: duration_min
     allowed_groupings: [off_block_hour, off_block_date, aircraft_type, weight_class_icao, carrier, runway, gate]
+    source: "Off-block time is Aerobahn's Actual Off Block Time (confirmed by the Port)."
     known_limits:
       - "Hour of day is the local hour of actual off-block."
+      - "The export's own Actual Taxi Out Time uses AODB off-block, so it differs from this metric by design."
       - "Weight classes in this data are only M (medium) and H (heavy)."
 
   movement_area_time:
@@ -86,13 +88,16 @@ metrics:
 
   taxiway_usage:
     questions: [Q7]
-    definition: "Taxiway usage is the number of distinct flight legs that used each taxiway segment (to enter or exit the runway, or the ramp)."
+    definition: "Taxiway usage is the number of distinct flight legs that used each taxiway (e.g. Bravo) or each taxiway section (e.g. Bravo segment 28) to enter or exit the runway or the ramp."
     view: v_taxiway_usage
     value_column: "COUNT(DISTINCT flight_info_id, operation)"
-    allowed_groupings: [taxiway_segment, segment_role, operation, runway]
+    allowed_groupings: [taxiway_name, taxiway_letter, taxiway_segment, segment_number, segment_role, operation, runway]
+    segment_codes: "Phonetic alphabet (confirmed by the Port): TaxiwaySegment_B_28 = taxiway Bravo (B), segment 28. By taxiway: group by taxiway_name. By section: group by taxiway_segment."
+    taxiway_letters: {A: Alpha, B: Bravo, C: Charlie, D: Delta, E: Echo, F: Foxtrot, G: Golf, J: Juliet, K: Kilo, L: Lima, M: Mike, N: November, P: Papa, Q: Quebec, Z: Zulu}
     known_limits:
-      - "PENDING: mapping of segment codes (e.g. TaxiwaySegment_B_28) to taxiway names such as Tango, Hotel and Whiskey."
-      - "Each leg records at most one runway-side and one ramp-side segment, not the full taxi route."
+      - "Tango, Hotel and Whiskey do not appear in this data: the export only records the segment used to enter/exit the runway and the ramp, not the full taxi route. Say so if a user asks about them."
+      - "Each leg records at most one runway-side and one ramp-side segment."
+      - "TaxiwaySegment_B_SSR is on Bravo but has no segment number (segment_number is NULL); its meaning is not yet confirmed."
       - "Missed approaches are not included."
 
   runway_utilization:
