@@ -1,6 +1,8 @@
 # Database Schema — `seatac` (MySQL)
 
 > What is in the new database, where every column comes from, and how the metric views are defined.
+> **New here?** Read [DB_GUIDE.md](DB_GUIDE.md) first: a shorter guide to the layers, views, rules, tests and how to contribute. This page is the full reference.
+>
 > Related docs: [DATA_CHANGES.md](DATA_CHANGES.md) (old vs new data) · [SETUP_GUIDE.md](SETUP_GUIDE.md) (load it) · [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · Team 6's old database: [legacy/DB_SCHEMA_TEAM6.md](legacy/DB_SCHEMA_TEAM6.md)
 >
 > **Source data:** the Port of Seattle's Aerobahn export `August_8_and_9_2025_Anonymized.xlsx` (one sheet, 1,061 rows × 585 columns). **It is private and not in this repo.** Neither is any dump of this database: it contains real tail numbers and transponder codes. Built by [`src/database/scripts/load_aerobahn.py`](../src/database/scripts/load_aerobahn.py). Numbers below were verified on 2026-10-19 with [`check_seatac.py`](../src/database/scripts/check_seatac.py).

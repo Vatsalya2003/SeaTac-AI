@@ -70,7 +70,9 @@ SeaTac-AI/
 ├── docs/
 │   ├── PROJECT_SUMMARY.md    Background and history
 │   ├── TECH_STACK.md         Technologies and versions
+│   ├── DB_GUIDE.md           Start here for the new database: layers, views, rules, how to contribute
 │   ├── DB_SCHEMA.md          The new database: tables, views, keys, checks
+│   ├── seatac_schema.sql     Structure-only schema export (no data), for ER diagram tools
 │   ├── DATA_CHANGES.md       Old sample vs the Port’s updated data
 │   ├── DEVELOPER_GUIDE.md    How the code works, known issues
 │   ├── SETUP_GUIDE.md        Step-by-step local setup
@@ -83,12 +85,15 @@ SeaTac-AI/
     ├── frontend/             React web app
     ├── database/
     │   ├── data/AIplane.sql  The previous cohort’s sample database
-    │   ├── scripts/          load_aerobahn.py, check_seatac.py, build_aiplane_v2.py
+    │   ├── scripts/          load_aerobahn.py, check_seatac.py, build_aiplane_v2.py, create_reader.py
+│   ├── tests/            Automated tests for the seatac database (pytest -q)
     │   ├── sql/              seatac_views.sql (the metric views)
     │   ├── metric_rules.yaml Definitions for the 10 questions
     │   └── requirements.txt
     └── electron/             Fall 2025 desktop wrapper (not runnable)
 ```
+
+New to the database? Start with [docs/DB_GUIDE.md](docs/DB_GUIDE.md), then [docs/DB_SCHEMA.md](docs/DB_SCHEMA.md) for the full column reference.
 
 ## Quick start
 
