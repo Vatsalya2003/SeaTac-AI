@@ -10,6 +10,8 @@
 --   included          1 when exclusion_reason IS NULL
 --   selection_time    the timestamp the confirmed selection rule uses to place the row in a reporting window,
 --                     with selection_date and selection_hour (local). Windows include the start and exclude the end.
+-- Views that can be grouped by aircraft type also have aircraft_type_group = COALESCE(aircraft_type, 'Unknown'),
+-- so legs with no FAA type form an 'Unknown' group. aircraft_type itself is unchanged (NULL stays NULL).
 -- No view applies an upper cutoff or a minimum group size. Zero and very long durations are kept.
 -- Statements are separated by a semicolon at the end of a line. Keep semicolons out of comments.
 
@@ -17,7 +19,7 @@
 -- Never uses Actual Landing in place of wheels down. Selection: arrivals by wheels-down time.
 CREATE OR REPLACE VIEW v_taxi_in AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, f.weight_class_icao,
+  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao,
   COALESCE(f.weight_class_icao, 'Unknown') AS weight_class_group,
   f.runway, f.gate, f.sea_date,
   f.wheels_down AS start_time,
@@ -38,7 +40,7 @@ WHERE f.operation = 'Arrival';
 -- Selection: departures by off-block time, so a flight pushing back before midnight belongs to the earlier day.
 CREATE OR REPLACE VIEW v_taxi_out AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, f.weight_class_icao,
+  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao,
   COALESCE(f.weight_class_icao, 'Unknown') AS weight_class_group,
   f.runway, f.gate, f.sea_date,
   f.actual_off_block AS start_time,
@@ -74,7 +76,7 @@ UNION ALL SELECT 'Unknown', 'Unknown', 4;
 -- selection_time is the interval start.
 CREATE OR REPLACE VIEW v_movement_area AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao, f.runway, f.sea_date,
   f.wheels_down AS start_time,
   f.movement_area_exit AS end_time,
   f.wheels_down AS selection_time,
@@ -89,7 +91,7 @@ FROM flights f
 WHERE f.operation = 'Arrival'
 UNION ALL
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao, f.runway, f.sea_date,
   f.movement_area_entrance,
   f.wheels_up,
   f.movement_area_entrance,
@@ -157,7 +159,7 @@ FROM peaks p CROSS JOIN exclusion_counts c;
 -- Selection: by the start of the occupancy interval (touchdown / runway entry).
 CREATE OR REPLACE VIEW v_runway_occupancy AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao, f.runway, f.sea_date,
   f.wheels_down AS start_time,
   f.runway_exit AS end_time,
   f.wheels_down AS selection_time,
@@ -172,7 +174,7 @@ FROM flights f
 WHERE f.operation = 'Arrival'
 UNION ALL
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+  f.flight_info_id, f.operation, f.call_sign, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao, f.runway, f.sea_date,
   f.runway_entrance,
   f.wheels_up,
   f.runway_entrance,
@@ -192,7 +194,7 @@ WHERE f.operation = 'Departure';
 -- Selection: departures by actual take-off time.
 CREATE OR REPLACE VIEW v_takeoff_delay AS
 SELECT
-  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, f.weight_class_icao, f.runway, f.sea_date,
+  f.flight_info_id, f.operation, f.call_sign, f.carrier, f.aircraft_type, COALESCE(f.aircraft_type, 'Unknown') AS aircraft_type_group, f.weight_class_icao, f.runway, f.sea_date,
   f.scheduled_take_off,
   f.wheels_up,
   f.wheels_up AS selection_time,

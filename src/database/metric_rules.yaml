@@ -11,7 +11,7 @@ data_scope: "One operating day at SEA: 2025-08-08 (from the Port's August 8-9 20
 
 # Which metric answers each of the Port's 10 questions (Gate Query User Story, "Final 10 Questions").
 questions:
-  Q1:  {title: "Taxi-In Performance (by aircraft type)", metrics: [taxi_in], group_by: aircraft_type}
+  Q1:  {title: "Taxi-In Performance (by aircraft type)", metrics: [taxi_in], group_by: aircraft_type_group}
   Q2:  {title: "Taxi-Out Performance (by hour of day)", metrics: [taxi_out], group_by: selection_hour}
   Q3:  {title: "Movement Area Occupancy", metrics: [movement_area_peak, movement_area_time]}
   Q4:  {title: "Runway Occupancy Time", metrics: [runway_occupancy]}
@@ -33,6 +33,7 @@ common_rules:
   - "No minimum group size is required."
   - "Calculate at full timestamp precision. Display average minutes rounded to 2 decimals: ROUND(AVG(duration_min), 2)."
   - "Show 'No data' for a group with no eligible rows. Never show 0 in its place."
+  - "Group by aircraft type with aircraft_type_group (legs with no FAA type are grouped as 'Unknown'). aircraft_type itself stays NULL for those legs."
 
 metrics:
   taxi_in:
@@ -41,7 +42,7 @@ metrics:
     view: v_taxi_in
     value_column: duration_min
     selection: "Arrivals selected by wheels-down time (selection_time = wheels_down)."
-    allowed_groupings: [aircraft_type, weight_class_group, carrier, runway, gate]
+    allowed_groupings: [aircraft_type_group, weight_class_group, carrier, runway, gate]
     known_limits:
       - "End confirmed as actual in-block. Never use Actual Landing in place of wheels down (equivalence not confirmed by the Port)."
       - "Q8 uses the same interval with no grouping: one overall average across all eligible arrivals. Q1 gives the aircraft-type breakdown."
@@ -53,7 +54,7 @@ metrics:
     view: v_taxi_out
     value_column: duration_min
     selection: "Departures selected by off-block time (selection_time = actual_off_block), not sea_date: a flight pushing back before midnight belongs to the earlier day."
-    allowed_groupings: [selection_hour, selection_date, aircraft_type, weight_class_group, carrier, runway, gate]
+    allowed_groupings: [selection_hour, selection_date, aircraft_type_group, weight_class_group, carrier, runway, gate]
     source: "Off-block time is Aerobahn's Actual Off Block Time (confirmed by the Port)."
     known_limits:
       - "Hour of day is the local hour of actual off-block (selection_hour, also available as off_block_hour)."
@@ -73,7 +74,7 @@ metrics:
     view: v_movement_area
     value_column: duration_min
     selection: "Intervals overlapping the window count: start_time < window_end AND end_time > window_start."
-    allowed_groupings: [operation, runway, aircraft_type, weight_class_icao]
+    allowed_groupings: [operation, runway, aircraft_type_group, weight_class_icao]
     known_limits:
       - "Entry time counts and exit time doesn't (interval [start, end))."
       - "PENDING PORT CONFIRMATION: mapping Aerobahn's Movement Area Entrance/Exit events to the client's hatched-area boundary."
@@ -97,7 +98,7 @@ metrics:
     view: v_runway_occupancy
     value_column: duration_sec
     selection: "By the start of the occupancy interval (selection_time): touchdown for arrivals, runway entry for departures."
-    allowed_groupings: [runway, operation, aircraft_type, weight_class_icao]
+    allowed_groupings: [runway, operation, aircraft_type_group, weight_class_icao]
     known_limits:
       - "Clear Active is not used (Port instruction). The export's own Runway Occupancy Time uses CrossThreshold and Clear Active, so it differs by design."
       - "Arrivals and departures are measured from different events, so report them separately or say they are combined."
@@ -108,7 +109,7 @@ metrics:
     view: v_takeoff_delay
     value_column: delay_min
     selection: "Departures selected by actual take-off time (selection_time = wheels_up)."
-    allowed_groupings: [carrier, runway, aircraft_type, weight_class_icao]
+    allowed_groupings: [carrier, runway, aircraft_type_group, weight_class_icao]
     known_limits:
       - "No delay threshold is applied. Early take-offs (negative values) are kept."
       - "If scheduled take-off is missing, the calculation cannot be completed (exclusion_reason 'missing scheduled take-off'). Never substitute scheduled off-block."

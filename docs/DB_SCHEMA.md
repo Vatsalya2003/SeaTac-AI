@@ -178,6 +178,7 @@ Defined in [`src/database/sql/seatac_views.sql`](../src/database/sql/seatac_view
 **Every view has:**
 - `exclusion_reason`: NULL means the row is used. `'missing time'` means the start or end is NULL. `'negative duration'` means end < start (**except `v_takeoff_delay`**, where negative = early and is kept).
 - `included`: 1 when `exclusion_reason` is NULL.
+- `aircraft_type_group` (in `v_taxi_in`, `v_taxi_out`, `v_movement_area`, `v_runway_occupancy`, `v_takeoff_delay`): `COALESCE(aircraft_type, 'Unknown')`. **Group by this, not `aircraft_type`**, so the legs with no FAA type form an `'Unknown'` group (1 arrival and 2 departures in this data). `aircraft_type` itself is unchanged.
 - `selection_time`, `selection_date`, `selection_hour`: the timestamp the confirmed selection rule uses to place the row in a reporting window (local). **Filter windows on these, not on `sea_date`**: windows include the start and exclude the end.
 
 View-specific reasons: `'missing scheduled take-off'` / `'missing take-off'` (`v_takeoff_delay`: the calculation cannot be completed), `'missing segment'` (`v_taxiway_usage`), `'missed approach'` and `'missing runway'` (`v_runway_activity`). No view has an upper cutoff or a minimum group size; zero and very long durations are kept. The helper views `v_movement_area_hourly_peak`, `v_peak_hours` and `v_weight_classes` have no per-row exclusions.
