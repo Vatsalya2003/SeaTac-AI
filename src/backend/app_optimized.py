@@ -30,6 +30,7 @@ import json
 import re
 from datetime import datetime, date
 from decimal import Decimal
+from types import SimpleNamespace
 import os
 from dotenv import load_dotenv
 import uvicorn
@@ -57,6 +58,11 @@ app.add_middleware(
 # Configuration
 CLAUDE_API_KEY = os.getenv('CLAUDE_API_KEY')
 CLAUDE_MODEL = os.getenv('CLAUDE_MODEL', 'claude-sonnet-4-20250514')  # Latest fast model
+
+# LLM provider: "claude" (default) or "gemini"
+LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'claude').strip().lower()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 
 # ============================================================================
 # MODAL DISABLED FOR SPEED - SET TO True TO RE-ENABLE
@@ -1120,8 +1126,40 @@ LIMIT 100
 # CLAUDE API CLIENT
 # ============================================================================
 
-# Initialize Claude client
-claude_client = Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
+class GeminiClient:
+    """Minimal stand-in for the Anthropic client so the rest of this file can keep
+    calling client.messages.create(...). Supports single-turn text prompts only."""
+
+    def __init__(self, api_key: str, model: str):
+        from google import genai
+        from google.genai import types
+        self._client = genai.Client(api_key=api_key)
+        self._types = types
+        self.model = model
+        self.messages = SimpleNamespace(create=self._create)
+
+    def _create(self, model=None, max_tokens=1000, temperature=None, messages=None, **_):
+        prompt = "\n\n".join(m["content"] for m in (messages or []) if isinstance(m.get("content"), str))
+        config = self._types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max(max_tokens, 2048),  # Gemini's thinking tokens count against this limit
+            automatic_function_calling=self._types.AutomaticFunctionCallingConfig(disable=True),  # no tools used
+        )
+        response = self._client.models.generate_content(model=self.model, contents=prompt, config=config)
+        if not response.text:
+            reason = response.candidates[0].finish_reason if response.candidates else response.prompt_feedback
+            raise RuntimeError(f"Gemini returned no text ({reason})")
+        return SimpleNamespace(content=[SimpleNamespace(text=response.text)])
+
+
+# Initialize the LLM client. The name claude_client is kept for compatibility;
+# it holds a GeminiClient when LLM_PROVIDER=gemini.
+if LLM_PROVIDER == 'gemini':
+    claude_client = GeminiClient(GEMINI_API_KEY, GEMINI_MODEL) if GEMINI_API_KEY else None
+    ACTIVE_MODEL = GEMINI_MODEL
+else:
+    claude_client = Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
+    ACTIVE_MODEL = CLAUDE_MODEL
 
 
 # ============================================================================
@@ -1846,7 +1884,7 @@ async def handle_query(request: QueryRequest):
 async def health_check():
     return HealthResponse(
         status="healthy",
-        model=CLAUDE_MODEL,
+        model=ACTIVE_MODEL,
         modal_enabled=False,  # Disabled for speed
         modal_endpoint=None,
         claude_enabled=bool(claude_client),
@@ -1866,12 +1904,12 @@ async def startup_event():
     print()
     
     if claude_client:
-        print(f"🤖 Claude API: ENABLED ✅")
-        print(f"   Model: {CLAUDE_MODEL}")
+        print(f"🤖 LLM provider: {LLM_PROVIDER} ✅")
+        print(f"   Model: {ACTIVE_MODEL}")
         print(f"   Role: Direct SQL Generator + Insights")
         print(f"   Speed: ~2-3 seconds faster than Modal pipeline")
     else:
-        print(f"🤖 Claude API: NOT CONFIGURED ❌")
+        print(f"🤖 LLM provider '{LLM_PROVIDER}': NOT CONFIGURED (missing API key) ❌")
     
     print(f"\n🗄️  Database: {db_manager.db_config['database']}@{db_manager.db_config['host']}")
     if db_manager.test_connection():
