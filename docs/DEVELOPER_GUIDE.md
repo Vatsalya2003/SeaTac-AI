@@ -44,6 +44,8 @@ SeaTac-AI/
     │   ├── scripts/load_aerobahn.py   ★ Loads the Port's new export into the `seatac` database (rerunnable)
     │   ├── scripts/check_seatac.py    Verifies `seatac`: counts, keys, exclusions, old vs new (no averages)
     │   ├── scripts/build_aiplane_v2.py  New data in Team 6's old layout (`AIplane_v2`), for a fair baseline
+    │   ├── scripts/create_reader.py   Creates the read-only `seatac_reader` user (SELECT on the views only)
+    │   ├── tests/                     ★ Automated tests for `seatac` (pytest, §2.8)
     │   ├── sql/seatac_views.sql       ★ The metric views (Samer's definitions)
     │   ├── metric_rules.yaml          ★ Metric definitions, groupings, limits; Q1–Q10 → metric
     │   ├── requirements.txt           Packages for the database scripts
@@ -179,7 +181,45 @@ python build_aiplane_v2.py --file /path/to/...xlsx                             #
 
 - **Rerunnable:** each script drops and rebuilds only its own database (`seatac` / `AIplane_v2`), and both refuse to touch `AIplane`. They read `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` from the environment or from `src/backend/.env`.
 - **What gets built:** `raw_flight_details` (every non-empty column), `flights` (SEA-side times only), `aircraft_types`, and the metric views. Full reference: [DB_SCHEMA.md](DB_SCHEMA.md). What changed from the old data: [DATA_CHANGES.md](DATA_CHANGES.md).
-- **Never commit** the Excel file or a dump of `seatac` / `AIplane_v2` (real tail numbers and transponder codes). `.gitignore` blocks the usual file names; check `git status` before committing anyway.
+- **Never commit** the Excel file or a dump of `seatac` / `AIplane_v2` (real tail numbers and transponder codes). `.gitignore` blocks the usual file names; check `git status` before committing anyway. The one exception is [`seatac_schema.sql`](seatac_schema.sql): structure only, no rows (§2.8).
+
+### 2.8 Testing
+
+`src/database/tests/` is a pytest suite for the `seatac` database. It needs MySQL running, the `seatac` database loaded (§2.7), and the private Excel file. It never calls an AI API and never touches `AIplane`, `AIplane_v2` or the chatbot.
+
+```bash
+cd src/database
+source venv/bin/activate          # pip install -r requirements.txt installs pytest
+pytest -q
+```
+
+- **Excel file:** read from `SEATAC_DATA_FILE`, else `August_8_and_9_2025_Anonymized.xlsx` at the repo root. Without it, the tests that need the file are skipped.
+- **Credentials:** `DB_HOST` / `DB_PORT` / `DB_USER` / `DB_PASSWORD` from the environment or `src/backend/.env`, like the loader. The security tests also need **`SEATAC_READER_PASSWORD`** in `src/backend/.env`: pick any strong password. The suite creates or resets the `seatac_reader` user with it (`scripts/create_reader.py`). Never hard-code it; a test fails if the password appears in any file git would commit.
+- **The tests change the database:** the reproducibility test reruns `load_aerobahn.py` twice, so `seatac` is rebuilt during the run. Only `seatac` is affected.
+- **Output:** after the usual pytest result, two extra sections: **PASS/FAIL by test** and **Counts**. They show matched/mismatched counts and the keys of any mismatch (flight_info_ids or hours), never metric averages or answers. Expected answers are calculated by hand by the team and must stay independent, so don't add tests that print them.
+
+| File | What it checks |
+|---|---|
+| `test_01_structure.py` | Primary keys, both foreign keys (`fk_flights_aircraft_type`, `fk_flights_raw`), NOT NULL key columns, `operation` limited to Arrival / Departure / Missed Approach, indexes on `operation`, `aircraft_type`, `runway`. The selection-timestamp index test is skipped on purpose (37 ms max on 1,061 rows; revisit with live data) |
+| `test_02_integrity.py` | Counts match the Excel file (1,061 / 525 / 535 / 1), unique key, every `flights` row has a raw row, the SEA-side rule, every time in `flights` and `raw_flight_details` identical to the Excel value |
+| `test_03_rules.py` | Every view against an **independent pandas recalculation** from the Excel file ([`tests/excel_expected.py`](../src/database/tests/excel_expected.py), following [CLIENT_CONFIRMED_RULES.md](CLIENT_CONFIRMED_RULES.md)), flight by flight: durations, exclusions, exclusion reasons, selection date and hour, hourly peaks and ranks |
+| `test_04_edge_cases.py` | Midnight crossings (Q2, Q4), missing-time reasons, QTA3199 included, missed approach flagged and not counted, shared `flight_info_id` gives two legs, NULL weight class gives `weight_class_group` 'Unknown', NULL aircraft type gives `aircraft_type_group` 'Unknown', Light gives "No data", Q10 ties share a RANK, an event at exactly hh:00:00 falls in hour hh, the Port's Q4 example gives 76 s. Cases are found from the Excel file, not hard-coded |
+| `test_05_reproducibility.py` | Loader run twice: `CHECKSUM TABLE` and a hash of each view's ordered output are identical |
+| `test_06_determinism.py` | Each view query run twice returns the same rows in the same order |
+| `test_07_speed.py` | Each view query (all rows fetched) takes 500 ms or less (median of 3 runs) |
+| `test_08_security.py` | `seatac_reader` can read every view, can't read the tables or `AIplane`, and can't INSERT / UPDATE / DELETE / DROP / CREATE |
+| `test_09_privacy.py` | No view returns Registration, Mode S, ship number or source ID columns, or any of those values from the Excel file. `docs/seatac_schema.sql` has no INSERT statements |
+
+**Run part of the suite:** `pytest -q tests/test_03_rules.py`, or `pytest -q -k midnight`.
+
+**When you change a view or a rule:** update `tests/excel_expected.py` from the rules document, not from the SQL, so the two stay independent. After adding a view, add it to `VIEWS` in `tests/conftest.py` (a test fails until you do).
+
+**Schema file for the ER diagram:** after a schema change, regenerate the structure-only export and check it has no data:
+
+```bash
+mysqldump --no-data --routines seatac > docs/seatac_schema.sql   # add -u/-p or a defaults file as needed
+grep -ci "^insert" docs/seatac_schema.sql                          # must print 0
+```
 
 ---
 
