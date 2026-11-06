@@ -64,6 +64,15 @@ LLM_PROVIDER = os.getenv('LLM_PROVIDER', 'claude').strip().lower()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')
 
+# Query mode: "legacy" (default) = the old tables in DB_NAME, exactly as before.
+# "views" = the seatac metric views, through the read-only user seatac_reader (see views_mode.py).
+QUERY_MODE = os.getenv('QUERY_MODE', 'legacy').strip().lower()
+if QUERY_MODE not in ('legacy', 'views'):
+    raise ValueError(f"QUERY_MODE must be 'legacy' or 'views', not '{QUERY_MODE}'")
+VIEWS_MODE = QUERY_MODE == 'views'
+if VIEWS_MODE:
+    import views_mode
+
 # ============================================================================
 # MODAL DISABLED FOR SPEED - SET TO True TO RE-ENABLE
 # ============================================================================
@@ -113,6 +122,8 @@ class GreetingHandler:
     
     def is_greeting_or_casual(self, query: str) -> bool:
         """Check if query is a greeting or casual conversation"""
+        if VIEWS_MODE:
+            return views_mode.is_greeting_or_casual(query)
         query_lower = query.lower().strip()
         
         # Very short queries are likely greetings
@@ -281,7 +292,16 @@ class DirectClaudeSQLGenerator:
         try:
             print(f"🤖 Generating SQL query...")
             
-            sql_prompt = f"""{DETAILED_SCHEMA}
+            if VIEWS_MODE:
+                sql_prompt = f"""{views_mode.VIEWS_SCHEMA}
+
+USER QUESTION: "{query}"
+
+{views_mode.SQL_INSTRUCTIONS}
+
+SQL Query:"""
+            else:
+                sql_prompt = f"""{DETAILED_SCHEMA}
 
 USER QUERY: "{query}"
 
@@ -310,6 +330,9 @@ SQL Query:"""
             sql = sql.replace('```sql', '').replace('```', '').strip()
             if sql.endswith(';'):
                 sql = sql[:-1]
+            if VIEWS_MODE and sql.strip().upper() == 'CANNOT_ANSWER':
+                print("⚠️  Model says the views can't answer this question")
+                return None
             
             print(f"✅ Generated SQL query: {sql[:100]}...")
             return sql
@@ -1208,6 +1231,9 @@ class DatabaseManager:
             'password': os.getenv('DB_PASSWORD', ''),
             'database': os.getenv('DB_NAME', 'AIplane')
         }
+        if VIEWS_MODE:  # read-only user with SELECT on the seatac views only; DB_NAME is not used
+            self.db_config.update(user='seatac_reader', password=os.getenv('SEATAC_READER_PASSWORD', ''),
+                                  database=views_mode.VIEWS_DATABASE)
     
     def test_connection(self) -> bool:
         try:
@@ -1216,6 +1242,16 @@ class DatabaseManager:
             return True
         except Error:
             return False
+    
+    def fetch(self, sql: str) -> List[Dict[str, Any]]:
+        """Run a read-only helper query (views mode sample sizes) and return the rows. Raises on error."""
+        connection = mysql.connector.connect(**self.db_config)
+        try:
+            cursor = connection.cursor(dictionary=True)
+            cursor.execute(sql)
+            return cursor.fetchall()
+        finally:
+            connection.close()
     
     def execute_query(self, sql: str) -> Dict[str, Any]:
         print("\n" + "=" * 80)
@@ -1492,6 +1528,9 @@ class SeaTacAgent:
         print(f"Query: {query}")
         print("=" * 80)
         
+        if VIEWS_MODE:
+            return await self._generate_views_sql(query)
+        
         # STAGE 1: SQL generation (FAST)
         if self.modal_gen and hasattr(self.modal_gen, 'generate_sql'):
             print("\n📍 Generating SQL query...")
@@ -1674,6 +1713,8 @@ Return ONLY the SQL query, no explanations or markdown.
     
     async def process_query(self, query: str) -> Dict[str, Any]:
         """Process query with Claude-powered smart pipeline"""
+        if VIEWS_MODE:
+            return await self._process_views_query(query)
         try:
             reasoning_steps = []
             
@@ -1760,6 +1801,77 @@ Return ONLY the SQL query, no explanations or markdown.
                 'answer': f'Error: {str(e)}',
                 'sql_source': 'error'
             }
+    
+    # ============================================================================
+    # VIEWS MODE (QUERY_MODE=views): seatac views, SQL check, no fallback rows, answer written in code
+    # ============================================================================
+    
+    async def _generate_views_sql(self, query: str) -> Dict[str, Any]:
+        sql = await self.modal_gen.generate_sql(query) if self.modal_gen else None
+        if not sql:
+            return {'success': False, 'sql': None, 'source': 'none',
+                    'reason': "The question couldn't be turned into a query on the SeaTac views."}
+        ok, checked = views_mode.check_view_sql(sql)
+        if not ok:
+            print(f"🛑 Rejected generated SQL: {checked}")
+            return {'success': False, 'sql': sql, 'source': 'rejected',
+                    'reason': f"The generated query was rejected before running ({checked})."}
+        return {'success': True, 'sql': checked, 'source': 'generated'}
+    
+    async def _process_views_query(self, query: str) -> Dict[str, Any]:
+        try:
+            print(f"\n{'='*80}")
+            print(f"📥 Query (views mode): {query}")
+            print(f"{'='*80}")
+            reasoning_steps = []
+            sql_result = await self.generate_sql(query)
+            reasoning_steps.append({'action': 'generate_sql', 'observation': f"Generated via {sql_result['source']}"})
+            if not sql_result['success']:
+                return {
+                    'success': False,
+                    'answer': (f"I couldn't answer this reliably. {sql_result['reason']} "
+                               "Try rephrasing, or ask about taxi-in, taxi-out, runway occupancy, take-off delay, "
+                               "taxiway use, runway activity or peak hours."),
+                    'reasoning_steps': reasoning_steps,
+                    'sql_queries': [sql_result['sql']] if sql_result['sql'] else [],
+                    'sql_source': sql_result['source']
+                }
+            sql = sql_result['sql']
+            # No hour-filter injection in views mode: time filters belong in the SQL (selection_date / selection_hour).
+            result = self.db_manager.execute_query(sql)
+            reasoning_steps.append({'action': 'execute_sql', 'observation': f"Retrieved {result.get('row_count', 0)} rows"})
+            if not result['success']:
+                return {
+                    'success': False,
+                    'answer': f"I couldn't answer this reliably: the query failed ({result.get('error')}).",
+                    'reasoning_steps': reasoning_steps,
+                    'sql_queries': [sql],
+                    'sql_source': 'generated'
+                }
+            answer = views_mode.build_answer(sql, result['data'], self.db_manager.fetch)
+            output_pref = self.format_classifier.classify(query)
+            chart = None
+            if output_pref.show_chart and result['data']:
+                chart = self.chart_generator.generate_chart(result['data'], "SeaTac Operations")
+            return {
+                'success': True,
+                'answer': answer,
+                'use_case': 'Analysis',
+                'reasoning_steps': reasoning_steps,
+                'sql_queries': [sql],
+                'data': result['data'][:100],
+                'row_count': result['row_count'],
+                'chart': chart,
+                'insights': [answer],
+                'output_format': output_pref.format,
+                'output_confidence': output_pref.confidence,
+                'sql_source': 'generated'
+            }
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'answer': f"I couldn't answer this reliably: {e}", 'sql_source': 'error'}
     
     async def _generate_insights(self, query: str, data: List[Dict]) -> str:
         """Generate insights using Claude"""
@@ -1911,6 +2023,9 @@ async def startup_event():
     else:
         print(f"🤖 LLM provider '{LLM_PROVIDER}': NOT CONFIGURED (missing API key) ❌")
     
+    if VIEWS_MODE:
+        print(f"\n🔎 Query mode: views (seatac views, read-only user {db_manager.db_config['user']}; "
+              f"SQL checked before running; answers written in code)")
     print(f"\n🗄️  Database: {db_manager.db_config['database']}@{db_manager.db_config['host']}")
     if db_manager.test_connection():
         print(f"   Status: Connected ✅")

@@ -7,3 +7,4 @@ pydantic>=2.12.5,<3  # google-genai needs >=2.12.5; works with fastapi 0.109
 requests==2.31.0
 httpx>=0.25.0
 google-genai>=2.0  # only used when LLM_PROVIDER=gemini
+PyYAML>=6.0,<7  # only used when QUERY_MODE=views (reads src/database/metric_rules.yaml)
