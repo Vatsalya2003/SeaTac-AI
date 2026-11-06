@@ -8,3 +8,4 @@ requests==2.31.0
 httpx>=0.25.0
 google-genai>=2.0  # only used when LLM_PROVIDER=gemini
 PyYAML>=6.0,<7  # only used when QUERY_MODE=views (reads src/database/metric_rules.yaml)
+pytest>=8,<10  # tests/ (run from src/backend: pytest -q; needs MySQL with the seatac database)
