@@ -11,10 +11,6 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -39,7 +35,7 @@ export function DataTableWithExport({
   data, 
   columns: providedColumns,
   title,
-  pageSize = 10,
+  pageSize = 5,
   searchable = true,
   sortable = true,
   exportable = true
@@ -48,7 +44,7 @@ export function DataTableWithExport({
   const columns = providedColumns || (data.length > 0 ? Object.keys(data[0]) : []);
   
   // State management
-  const [currentPage, setCurrentPage] = useState(1);
+  const [expanded, setExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortColumn, setSortColumn] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<SortDirection>(null);
@@ -58,7 +54,7 @@ export function DataTableWithExport({
     ? data.filter(row =>
         columns.some(col => {
           const value = row[col];
-          return value && String(value).toLowerCase().includes(searchTerm.toLowerCase());
+          return value != null && String(value).toLowerCase().includes(searchTerm.toLowerCase());
         })
       )
     : data;
@@ -90,11 +86,10 @@ export function DataTableWithExport({
       })
     : filteredData;
 
-  // Pagination
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedData = sortedData.slice(startIndex, endIndex);
+  // Preview the first rows; expanding reveals every filtered result.
+  const startIndex = 0;
+  const endIndex = expanded ? sortedData.length : pageSize;
+  const paginatedData = sortedData.slice(0, endIndex);
 
   // Handle sort
   const handleSort = (column: string) => {
@@ -137,11 +132,15 @@ export function DataTableWithExport({
   };
 
   // Format cell value
-  const formatValue = (value: any): string => {
-    if (value == null) return '-';
+  const isNumeric = (col: string) => data.some(row => typeof row[col] === 'number');
+  const formatValue = (value: any, col: string): string => {
+    if (value == null) return 'No data';
     if (typeof value === 'number') {
-      // Format numbers with commas
-      return value.toLocaleString();
+      const average = /^avg_|^average_/.test(col);
+      return value.toLocaleString('en-US', {
+        minimumFractionDigits: average ? 2 : 0,
+        maximumFractionDigits: average ? 2 : Number.isInteger(value) ? 0 : 2,
+      });
     }
     if (value instanceof Date) {
       return value.toLocaleString();
@@ -151,6 +150,15 @@ export function DataTableWithExport({
 
   // Format column header
   const formatHeader = (col: string): string => {
+    const labels: Record<string, string> = {
+      aircraft_type_group: 'Aircraft type', weight_class_group: 'Weight class',
+      avg_taxi_in_min: 'Avg. taxi-in (min)', avg_taxi_out_min: 'Avg. taxi-out (min)',
+      avg_occupancy_sec: 'Avg. occupancy (sec)', avg_occupancy_min: 'Avg. occupancy (min)',
+      avg_takeoff_delay_min: 'Avg. takeoff delay (min)', local_hour: 'Hour',
+      off_block_hour: 'Off-block hour', max_aircraft_in_area: 'Peak aircraft',
+      completed_operations: 'Completed operations', hour_rank: 'Rank',
+    };
+    if (labels[col]) return labels[col];
     return col
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -166,7 +174,7 @@ export function DataTableWithExport({
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           )}
           <p className="text-sm text-gray-500 mt-1">
-            Showing {startIndex + 1}-{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
+            Showing {sortedData.length ? startIndex + 1 : 0}–{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
           </p>
         </div>
         
@@ -184,7 +192,7 @@ export function DataTableWithExport({
       </div>
 
       {/* Search Bar */}
-      {searchable && data.length > 0 && (
+      {searchable && data.length > 10 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -192,7 +200,7 @@ export function DataTableWithExport({
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
-              setCurrentPage(1); // Reset to first page on search
+              setExpanded(false);
             }}
             className="pl-10"
           />
@@ -201,7 +209,7 @@ export function DataTableWithExport({
 
       {/* Table */}
       <div className="rounded-lg border border-gray-200 bg-white overflow-hidden">
-        <Table>
+        <Table className="query-data-table">
           <TableHeader>
             <TableRow className="bg-gray-50">
               {columns.map((col) => (
@@ -209,6 +217,7 @@ export function DataTableWithExport({
                   key={col}
                   className={cn(
                     "font-semibold text-gray-700",
+                    isNumeric(col) && "query-number",
                     sortable && "cursor-pointer select-none hover:bg-gray-100"
                   )}
                   onClick={() => handleSort(col)}
@@ -247,8 +256,8 @@ export function DataTableWithExport({
               paginatedData.map((row, rowIndex) => (
                 <TableRow key={rowIndex} className="hover:bg-gray-50">
                   {columns.map((col) => (
-                    <TableCell key={col} className="text-gray-900">
-                      {formatValue(row[col])}
+                    <TableCell key={col} className={cn('text-gray-900', isNumeric(col) && 'query-number')}>
+                      {formatValue(row[col], col)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -258,77 +267,15 @@ export function DataTableWithExport({
         </Table>
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            Page {currentPage} of {totalPages}
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronsLeft className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            
-            {/* Page numbers */}
-            <div className="flex gap-1">
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                
-                return (
-                  <Button
-                    key={pageNum}
-                    variant={currentPage === pageNum ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(pageNum)}
-                    className="w-8"
-                  >
-                    {pageNum}
-                  </Button>
-                );
-              })}
-            </div>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(totalPages)}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronsRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+      {sortedData.length > pageSize && (
+        <Button
+          variant="outline"
+          size="sm"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(value => !value)}
+        >
+          {expanded ? 'Show fewer rows' : `Show all ${sortedData.length} rows`}
+        </Button>
       )}
     </div>
   );

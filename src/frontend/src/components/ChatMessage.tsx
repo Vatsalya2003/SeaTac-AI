@@ -8,6 +8,7 @@ import { DataTableWithExport } from './DataTableWithExport';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import './query-results.css';
 
 interface Message {
   id: string;
@@ -24,7 +25,13 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>('table');
+  const hasData = message.role === 'assistant' && !!message.data?.length;
+  const detailStart = message.role === 'assistant'
+    ? message.content.search(/\*\*(?:Sample|Definition)[^\n]*?:\*\*/)
+    : -1;
+  const details = detailStart >= 0 ? message.content.slice(detailStart) : '';
+  const answer = detailStart >= 0 ? message.content.slice(0, detailStart) : message.content;
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -74,9 +81,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
         </div>
         
         {/* Markdown content */}
-        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
+        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={hasData ? {
+            table: () => null,
+          } : undefined}>
+            {hasData ? answer.replace(/^\*\*Answer(?::\*\*|\*\*)[^\n]*(?:\n|$)/i, '') : answer}
           </ReactMarkdown>
         </div>
 
@@ -110,7 +119,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <DataTableWithExport 
                 data={message.data} 
                 title="SeaTac Operations Analysis"
-                pageSize={15}
+                pageSize={5}
               />
             )}
           </div>
@@ -129,8 +138,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <DataTableWithExport 
               data={message.data} 
               title="Query Results"
-              pageSize={15}
+              pageSize={5}
             />
+          </div>
+        )}
+
+        {details && (
+          <div className="query-calculation-details">
+            <div className="query-details-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{details}</ReactMarkdown>
+            </div>
           </div>
         )}
 
