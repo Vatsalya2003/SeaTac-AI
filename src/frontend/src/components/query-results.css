@@ -1,0 +1,19 @@
+.query-calculation-details { margin-top: 18px; border-top: 1px solid #e2e8f0; padding-top: 12px; color: #475569; font-size: 13px; }
+.query-calculation-details > summary, .query-export > summary { cursor: pointer; font-weight: 500; }
+.query-details-body { padding-top: 10px; line-height: 1.7; }
+.query-details-body p { margin: 0 0 9px; }
+.query-data-table { border-collapse: collapse; width: 100%; }
+.query-data-table th { padding: 14px 18px; background: #f8fafc; font-size: 12px; color: #475569; border-bottom: 1px solid #e2e8f0; }
+.query-data-table td { padding: 11px 18px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+.query-data-table tbody tr:last-child td { border-bottom: 0; }
+.query-data-table tbody tr:nth-child(even) { background: #fafbfc; }
+.query-data-table tbody tr:hover { background: #eff6ff; }
+.query-data-table .query-number { text-align: right; font-variant-numeric: tabular-nums; }
+.query-data-table th.query-number > div { justify-content: flex-end; }
+.query-export { position: relative; margin-top: 10px; font-size: 13px; color: #475569; }
+.query-export > summary { display: inline-block; border: 1px solid #e2e8f0; border-radius: 7px; padding: 7px 12px; background: white; }
+.query-export-options { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+.query-answer table th, .query-answer table td { padding: 8px 14px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+.query-chart-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px; color: #64748b; }
+.query-chart-filter label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: #334155; font-weight: 500; }
+.query-chart-filter input { accent-color: #2563eb; width: 16px; height: 16px; }

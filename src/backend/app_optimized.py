@@ -35,14 +35,13 @@ import os
 from dotenv import load_dotenv
 import uvicorn
 import requests
-from anthropic import Anthropic  # NEW: Claude SDK
 
 load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(
     title="SeaTac Airport Operations Intelligence",
-    description="AI-powered airport operations analysis - Direct Claude v8.0 (Fast Mode)",
+    description="AI-powered airport operations analysis with Gemini and validated SeaTac views",
     version="8.0.0"
 )
 
@@ -299,7 +298,7 @@ class DirectClaudeSQLGenerator:
             print(f"🤖 Generating SQL query...")
             
             if VIEWS_MODE:
-                sql_prompt = f"""{views_mode.VIEWS_SCHEMA}
+                sql_prompt = f"""{views_mode.SQL_REFERENCE_CONTEXT}
 
 USER QUESTION: "{query}"
 
@@ -1157,28 +1156,31 @@ LIMIT 100
 
 class GeminiClient:
     """Minimal stand-in for the Anthropic client so the rest of this file can keep
-    calling client.messages.create(...). Supports single-turn text prompts only."""
+    calling client.messages.create(...). Uses Gemini's current Interactions API
+    and supports the single-turn text prompts used by this application."""
 
     def __init__(self, api_key: str, model: str):
         from google import genai
-        from google.genai import types
         self._client = genai.Client(api_key=api_key)
-        self._types = types
         self.model = model
         self.messages = SimpleNamespace(create=self._create)
 
     def _create(self, model=None, max_tokens=1000, temperature=None, messages=None, **_):
         prompt = "\n\n".join(m["content"] for m in (messages or []) if isinstance(m.get("content"), str))
-        config = self._types.GenerateContentConfig(
-            temperature=temperature,
-            max_output_tokens=max(max_tokens, 2048),  # Gemini's thinking tokens count against this limit
-            automatic_function_calling=self._types.AutomaticFunctionCallingConfig(disable=True),  # no tools used
+        interaction = self._client.interactions.create(
+            model=self.model,
+            input=prompt,
+            store=False,
+            generation_config={
+                # SQL generation is deterministic and does not need Gemini's
+                # default medium reasoning, which can add substantial latency.
+                'thinking_level': 'minimal',
+                'max_output_tokens': max(max_tokens, 2048),
+            },
         )
-        response = self._client.models.generate_content(model=self.model, contents=prompt, config=config)
-        if not response.text:
-            reason = response.candidates[0].finish_reason if response.candidates else response.prompt_feedback
-            raise RuntimeError(f"Gemini returned no text ({reason})")
-        return SimpleNamespace(content=[SimpleNamespace(text=response.text)])
+        if not interaction.output_text:
+            raise RuntimeError(f"Gemini returned no text (status={interaction.status})")
+        return SimpleNamespace(content=[SimpleNamespace(text=interaction.output_text)])
 
 
 # Initialize the LLM client. The name claude_client is kept for compatibility;
@@ -1187,6 +1189,7 @@ if LLM_PROVIDER == 'gemini':
     claude_client = GeminiClient(GEMINI_API_KEY, GEMINI_MODEL) if GEMINI_API_KEY else None
     ACTIVE_MODEL = GEMINI_MODEL
 else:
+    from anthropic import Anthropic
     claude_client = Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
     ACTIVE_MODEL = CLAUDE_MODEL
 
@@ -1219,7 +1222,12 @@ class QueryResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
+    provider: str
     model: str
+    query_mode: str
+    database: str
+    ai_enabled: bool
+    gemini_enabled: bool
     modal_enabled: bool
     modal_endpoint: Optional[str]
     claude_enabled: bool
@@ -1242,9 +1250,16 @@ class DatabaseManager:
             'password': os.getenv('DB_PASSWORD', ''),
             'database': os.getenv('DB_NAME', 'AIplane')
         }
-        if VIEWS_MODE:  # read-only user with SELECT on the seatac views only; DB_NAME is not used
-            self.db_config.update(user='seatac_reader', password=os.getenv('SEATAC_READER_PASSWORD', ''),
-                                  database=views_mode.VIEWS_DATABASE)
+        if VIEWS_MODE:
+            # Prefer a dedicated views-only account when configured. For local
+            # development, reuse the existing DB credentials and only switch
+            # the database; generated SQL is still restricted to approved
+            # `seatac` views by views_mode.check_view_sql().
+            self.db_config.update(
+                user=os.getenv('SEATAC_READER_USER') or self.db_config['user'],
+                password=os.getenv('SEATAC_READER_PASSWORD') or self.db_config['password'],
+                database=views_mode.VIEWS_DATABASE,
+            )
     
     def test_connection(self) -> bool:
         try:
@@ -2070,10 +2085,15 @@ async def handle_query(request: QueryRequest):
 async def health_check():
     return HealthResponse(
         status="healthy",
+        provider=LLM_PROVIDER,
         model=ACTIVE_MODEL,
+        query_mode=QUERY_MODE,
+        database=db_manager.db_config['database'],
+        ai_enabled=bool(claude_client),
+        gemini_enabled=LLM_PROVIDER == 'gemini' and bool(claude_client),
         modal_enabled=False,  # Disabled for speed
         modal_endpoint=None,
-        claude_enabled=bool(claude_client),
+        claude_enabled=LLM_PROVIDER == 'claude' and bool(claude_client),
         database_status="online" if db_manager.test_connection() else "offline",
         version="8.0.0"
     )
@@ -2082,10 +2102,10 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "=" * 80)
-    print("✈️  SeaTac Operations Intelligence - DIRECT CLAUDE v8.0 (FAST MODE)")
+    print("✈️  SeaTac Operations Intelligence - GEMINI + SEATAC VIEWS v8.0")
     print("=" * 80)
     
-    print(f"⚡ PRESENTATION SPEED MODE: Modal disabled, using Direct Claude")
+    print(f"⚡ PRESENTATION SPEED MODE: Modal disabled, using {LLM_PROVIDER.title()}")
     print(f"   Modal code preserved in comments (search for 'MODAL CODE')")
     print()
     
@@ -2109,16 +2129,16 @@ async def startup_event():
     else:
         print(f"   Status: Disconnected ❌")
     
-    print("\n⚡ OPTIMIZED SQL Pipeline (Direct Claude):")
-    print("   1️⃣  Claude generates SQL directly (SINGLE FAST API CALL)")
+    print(f"\n⚡ OPTIMIZED SQL Pipeline ({LLM_PROVIDER.title()}):")
+    print(f"   1️⃣  {LLM_PROVIDER.title()} generates SQL directly")
     print("   2️⃣  Auto-correct event types")
     print("   3️⃣  Execute SQL")
-    print("   4️⃣  Claude generates insights")
+    print("   4️⃣  Code builds the answer with definitions and sample sizes")
     
     print("\n✨ Speed Improvements v8.0:")
     print("   ✓ Eliminated Modal roundtrip (~2-3 sec saved)")
-    print("   ✓ Single Claude API call for SQL generation")
-    print("   ✓ Superior Claude SQL generation quality")
+    print(f"   ✓ Single {LLM_PROVIDER.title()} API call for SQL generation")
+    print("   ✓ SQL restricted to approved seatac views")
     print("   ✓ Auto-correction of event types")
     print("   ✓ Schema-aware generation")
     print("   ✓ Perfect for live presentations")
