@@ -328,3 +328,24 @@ def test_prompt_columns_exist_in_views(vm, admin_fetch):
 
 def test_prompt_lists_every_view(vm):
     assert all(v in vm.VIEWS_SCHEMA for v in vm.VIEWS)
+
+
+def test_validated_reference_queries_are_loaded(vm):
+    assert vm.QUESTION_QUERIES.exists()
+    assert vm.REFERENCE_QUERIES in vm.SQL_REFERENCE_CONTEXT
+    assert vm.REFERENCE_QUERY_INSTRUCTIONS in vm.SQL_REFERENCE_CONTEXT
+    assert not re.search(r"(?im)^\s*USE\s+", vm.REFERENCE_QUERIES)
+    assert all(re.search(rf"(?m)^-- Q{q}(?:\D|$)", vm.REFERENCE_QUERIES) for q in range(1, 11))
+
+
+def test_every_reference_select_passes_the_runtime_guard(vm):
+    uncommented = "\n".join(
+        line for line in vm.REFERENCE_QUERIES.splitlines()
+        if not line.lstrip().startswith("--")
+    )
+    statements = [statement.strip() for statement in uncommented.split(";") if statement.strip()]
+    assert len(statements) == 18
+    failures = [(index, vm.check_view_sql(statement)[1])
+                for index, statement in enumerate(statements, 1)
+                if not vm.check_view_sql(statement)[0]]
+    assert not failures
