@@ -66,12 +66,18 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-3.6-flash')
 
 # Query mode: "legacy" (default) = the old tables in DB_NAME, exactly as before.
 # "views" = the seatac metric views, through the read-only user seatac_reader (see views_mode.py).
+# "templates" = stage 2: the AI only picks which of the 10 questions is asked (intent.py) and a tested query
+# runs (templates.py). It uses the same read-only user and falls back to views mode for anything else.
 QUERY_MODE = os.getenv('QUERY_MODE', 'legacy').strip().lower()
-if QUERY_MODE not in ('legacy', 'views'):
-    raise ValueError(f"QUERY_MODE must be 'legacy' or 'views', not '{QUERY_MODE}'")
-VIEWS_MODE = QUERY_MODE == 'views'
+if QUERY_MODE not in ('legacy', 'views', 'templates'):
+    raise ValueError(f"QUERY_MODE must be 'legacy', 'views' or 'templates', not '{QUERY_MODE}'")
+TEMPLATES_MODE = QUERY_MODE == 'templates'
+VIEWS_MODE = QUERY_MODE in ('views', 'templates')  # templates mode reuses the views setup for its fallback
 if VIEWS_MODE:
     import views_mode
+if TEMPLATES_MODE:
+    import templates
+    import intent
 
 # ============================================================================
 # MODAL DISABLED FOR SPEED - SET TO True TO RE-ENABLE
@@ -1205,6 +1211,11 @@ class QueryResponse(BaseModel):
     output_format: Optional[str] = None
     output_confidence: Optional[float] = None
     sql_source: Optional[str] = None
+    # templates mode only (None otherwise)
+    metric: Optional[str] = None
+    definition: Optional[str] = None
+    included_count: Optional[int] = None
+    excluded: Optional[Dict[str, Any]] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -1243,12 +1254,13 @@ class DatabaseManager:
         except Error:
             return False
     
-    def fetch(self, sql: str) -> List[Dict[str, Any]]:
-        """Run a read-only helper query (views mode sample sizes) and return the rows. Raises on error."""
+    def fetch(self, sql: str, params=None) -> List[Dict[str, Any]]:
+        """Run a read-only helper query (views mode sample sizes, templates mode) and return the rows.
+        params are passed to the driver as query parameters (%s), never pasted into the SQL. Raises on error."""
         connection = mysql.connector.connect(**self.db_config)
         try:
             cursor = connection.cursor(dictionary=True)
-            cursor.execute(sql)
+            cursor.execute(sql, params or None)
             return cursor.fetchall()
         finally:
             connection.close()
@@ -1713,6 +1725,8 @@ Return ONLY the SQL query, no explanations or markdown.
     
     async def process_query(self, query: str) -> Dict[str, Any]:
         """Process query with Claude-powered smart pipeline"""
+        if TEMPLATES_MODE:
+            return await self._process_template_query(query)
         if VIEWS_MODE:
             return await self._process_views_query(query)
         try:
@@ -1872,7 +1886,61 @@ Return ONLY the SQL query, no explanations or markdown.
             import traceback
             traceback.print_exc()
             return {'success': False, 'answer': f"I couldn't answer this reliably: {e}", 'sql_source': 'error'}
-    
+
+    # ============================================================================
+    # TEMPLATES MODE (QUERY_MODE=templates): AI picks the question, a tested query answers it
+    # ============================================================================
+
+    async def _template_fallback(self, query: str, why: str) -> Dict[str, Any]:
+        """Anything the 10 templates don't cover goes to stage 1 (views mode), labelled source 'ai_sql'."""
+        print(f"↩️  Templates mode: {why} -> stage 1 (views mode)")
+        result = await self._process_views_query(query)
+        result['sql_source'] = 'ai_sql'
+        result['reasoning_steps'] = [{'action': 'pick_template', 'observation': why}] + result.get('reasoning_steps', [])
+        return result
+
+    async def _process_template_query(self, query: str) -> Dict[str, Any]:
+        print(f"\n{'='*80}")
+        print(f"📥 Query (templates mode): {query}")
+        print(f"{'='*80}")
+        client = getattr(self, 'intent_client', claude_client)
+        picked = intent.parse(query, client, ACTIVE_MODEL)
+        if not picked:
+            return await self._template_fallback(query, "no matching question template")
+        try:
+            out = templates.answer(picked['question'], self.db_manager.fetch, picked.get('date') or templates.DEFAULT_DAY)
+        except templates.IntentError as e:
+            return await self._template_fallback(query, f"invalid template request ({e})")
+        except Exception as e:
+            print(f"❌ Template query failed: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'answer': f"I couldn't answer this reliably: the tested query failed ({e}).",
+                    'sql_source': 'template', 'sql_queries': [], 'reasoning_steps': []}
+        for sql in out['sql_queries']:
+            print(f"📋 TEMPLATE SQL ({picked['question']}): {sql}")
+        steps = [{'action': 'pick_template', 'observation': f"{picked['question']} ({picked['source']})"},
+                 {'action': 'execute_sql', 'observation': f"Ran {len(out['sql_queries'])} tested quer"
+                                                          f"{'y' if len(out['sql_queries']) == 1 else 'ies'}"}]
+        return {
+            'success': True,
+            'answer': out['answer'],
+            'use_case': picked['question'],
+            'reasoning_steps': steps,
+            'sql_queries': out['sql_queries'],
+            'data': out['data'][:100],
+            'row_count': len(out['data']),
+            'chart': out['chart'],
+            'insights': [out['answer']],
+            'output_format': 'table',
+            'output_confidence': 1.0,
+            'sql_source': 'template',
+            'metric': out['metric'],
+            'definition': out['definition'],
+            'included_count': out['included_count'],
+            'excluded': out['excluded'],
+        }
+
     async def _generate_insights(self, query: str, data: List[Dict]) -> str:
         """Generate insights using Claude"""
         if not data:
@@ -1918,6 +1986,8 @@ db_manager = DatabaseManager()
 
 # Agent uses direct Claude generator for speed
 agent_system = SeaTacAgent(direct_claude_generator, claude_validator, db_manager) if claude_client else None
+if TEMPLATES_MODE and agent_system is None:  # tested answers work without an AI key (keyword match)
+    agent_system = SeaTacAgent(None, None, db_manager)
 
 
 # ============================================================================
@@ -1985,7 +2055,11 @@ async def handle_query(request: QueryRequest):
             chart=result.get('chart'),
             output_format=result.get('output_format'),
             output_confidence=result.get('output_confidence'),
-            sql_source=result.get('sql_source', 'generated')  # Default to generic 'generated'
+            sql_source=result.get('sql_source', 'generated'),  # Default to generic 'generated'
+            metric=result.get('metric'),
+            definition=result.get('definition'),
+            included_count=result.get('included_count'),
+            excluded=result.get('excluded')
         )
         
     except Exception as e:
@@ -2023,7 +2097,10 @@ async def startup_event():
     else:
         print(f"🤖 LLM provider '{LLM_PROVIDER}': NOT CONFIGURED (missing API key) ❌")
     
-    if VIEWS_MODE:
+    if TEMPLATES_MODE:
+        print(f"\n🧩 Query mode: templates (AI picks one of the 10 questions, a tested query runs as "
+              f"{db_manager.db_config['user']}; anything else falls back to views mode)")
+    elif VIEWS_MODE:
         print(f"\n🔎 Query mode: views (seatac views, read-only user {db_manager.db_config['user']}; "
               f"SQL checked before running; answers written in code)")
     print(f"\n🗄️  Database: {db_manager.db_config['database']}@{db_manager.db_config['host']}")
