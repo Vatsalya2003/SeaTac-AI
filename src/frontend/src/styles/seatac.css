@@ -1,21 +1,24 @@
 /*
- * SeaTac AI design system: palette, type and the app's components, in plain CSS.
+ * SeaTac AI design system: SEA airport colours, type and the app's components, in plain CSS.
  * index.css is a pre-built Tailwind file: utility classes that aren't already in it have no effect,
  * so new styles go here instead of new Tailwind classes. Loaded after index.css (src/main.tsx).
  */
 
 /* ---- tokens --------------------------------------------------------------------------------------------- */
 :root {
-  /* palette */
-  --sea-ink: #302d38;          /* Deep Charcoal Plum: text, 13.5:1 on white */
-  --sea-ink-muted: #6b6775;    /* secondary text, 5.5:1 on white */
-  --sea-accent: #6072a6;       /* Muted Slate Blue: buttons, links, focus; white text on it 4.7:1 */
-  --sea-accent-strong: #4e5e8f;/* accent hover / accent text on tinted surfaces, 6.3:1 on white */
-  --sea-mist: #d1d9e4;         /* Cool Mist Blue: borders and dividers */
-  --sea-mist-light: #eef1f6;   /* surfaces: sidebar, user bubble, chips */
-  --sea-blush: #cbb6b2;        /* Dusty Blush: small highlights only */
-  --sea-blush-light: #f6f0ef;  /* blush tint for the "not yet verified" badge */
-  --sea-field-border: #8e93a3; /* input outlines: 3.1:1 on white (WCAG non-text contrast) */
+  /* palette: Seattle-Tacoma International Airport (SEA) brand colours, from the airport logo */
+  --sea-ink: #1a2229;          /* logo charcoal: text, 16.1:1 on white */
+  --sea-ink-muted: #5b6670;    /* secondary text, 5.9:1 on white */
+  --sea-accent: #4bca00;       /* SEA green: filled buttons and marks, always with dark text (7.5:1); */
+                               /* white on it is only 2.1:1, so never white text on green */
+  --sea-accent-hover: #3eb300; /* filled hover, dark text 5.9:1 */
+  --sea-accent-strong: #2e7d0f;/* readable green on white (5.2:1): focus rings, green text, input focus */
+  --sea-accent-tint: #eef8e8;  /* light green: question bubble, verified badge, chip hover */
+  --sea-mist: #dde3e0;         /* borders and dividers */
+  --sea-mist-light: #f4f6f5;   /* neutral surfaces: sidebar */
+  --sea-warn-light: #fff6e5;   /* calm warm tint for the "not yet verified" badge */
+  --sea-warn-border: #ecd3a0;
+  --sea-field-border: #7c8790; /* input outlines: 3.7:1 on white (WCAG non-text contrast) */
   --sea-surface: #ffffff;
   --sea-danger: #a23b3b;       /* error text, 6.5:1 on white */
   --sea-danger-light: #fbf1f1;
@@ -31,9 +34,9 @@
   --sea-radius: 12px;
   --sea-radius-sm: 8px;
   --sea-radius-pill: 999px;
-  --sea-shadow: 0 1px 2px rgba(48, 45, 56, 0.06), 0 4px 16px rgba(48, 45, 56, 0.06);
+  --sea-shadow: 0 1px 2px rgba(26, 34, 41, 0.06), 0 4px 16px rgba(26, 34, 41, 0.06);
   --sea-column: 760px;
-  --sea-focus: 0 0 0 3px rgba(96, 114, 166, 0.35);
+  --sea-focus: 0 0 0 3px rgba(46, 125, 15, 0.3);
 }
 
 /* ---- base ----------------------------------------------------------------------------------------------- */
@@ -52,7 +55,7 @@ html, body {
 
 /* visible keyboard focus everywhere; mouse clicks don't show it */
 .sea-app :focus-visible, .sea-login :focus-visible {
-  outline: 2px solid var(--sea-accent);
+  outline: 2px solid var(--sea-accent-strong);
   outline-offset: 2px;
 }
 
@@ -72,8 +75,8 @@ html, body {
 .sea-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 .sea-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-.sea-btn-primary { background: var(--sea-accent); color: #fff; }
-.sea-btn-primary:hover:not(:disabled) { background: var(--sea-accent-strong); }
+.sea-btn-primary { background: var(--sea-accent); color: var(--sea-ink); font-weight: 600; }
+.sea-btn-primary:hover:not(:disabled) { background: var(--sea-accent-hover); }
 
 .sea-btn-secondary { background: var(--sea-surface); color: var(--sea-ink); border-color: var(--sea-mist); }
 .sea-btn-secondary:hover:not(:disabled) { background: var(--sea-mist-light); }
@@ -99,7 +102,7 @@ html, body {
   background: var(--sea-surface); color: var(--sea-ink); font: inherit; font-size: var(--sea-text);
 }
 .sea-input::placeholder { color: var(--sea-ink-muted); opacity: 1; }
-.sea-input:focus { outline: none; border-color: var(--sea-accent); box-shadow: var(--sea-focus); }
+.sea-input:focus { outline: none; border-color: var(--sea-accent-strong); box-shadow: var(--sea-focus); }
 .sea-app .sea-input:focus-visible, .sea-login .sea-input:focus-visible { outline: none; } /* the box-shadow ring is the focus state */
 .sea-input[aria-invalid="true"] { border-color: var(--sea-danger); }
 .sea-field-error { font-size: var(--sea-text-sm); color: var(--sea-danger); }
@@ -156,8 +159,8 @@ html, body {
   cursor: pointer; transition: background-color 0.15s, border-color 0.15s;
 }
 .sea-chip svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--sea-ink-muted); transition: color 0.15s; }
-.sea-chip:hover:not(:disabled) { background: var(--sea-mist-light); border-color: var(--sea-blush); }
-.sea-chip:hover:not(:disabled) svg { color: var(--sea-accent); }
+.sea-chip:hover:not(:disabled) { background: var(--sea-accent-tint); border-color: var(--sea-accent); }
+.sea-chip:hover:not(:disabled) svg { color: var(--sea-accent-strong); }
 .sea-chip:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 480px) { .sea-welcome { padding: 32px 16px 16px; } .sea-welcome h2 { font-size: 22px; } }
 
@@ -197,7 +200,7 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 }
 .sea-chat-item:hover { background: rgba(255, 255, 255, 0.7); }
 .sea-chat.is-active .sea-chat-item {
-  background: var(--sea-surface); font-weight: 500; box-shadow: inset 3px 0 0 var(--sea-blush), 0 1px 2px rgba(48, 45, 56, 0.06);
+  background: var(--sea-surface); font-weight: 500; box-shadow: inset 3px 0 0 var(--sea-accent), 0 1px 2px rgba(26, 34, 41, 0.06);
 }
 .sea-chat-delete {
   position: absolute; top: 50%; right: 4px; width: 30px; height: 30px; transform: translateY(-50%); opacity: 0;
@@ -213,7 +216,7 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-resize::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color 0.15s;
 }
-.sea-resize:hover::after, .sea-resize:focus-visible::after, body.sea-resizing .sea-resize::after { background: var(--sea-accent); }
+.sea-resize:hover::after, .sea-resize:focus-visible::after, body.sea-resizing .sea-resize::after { background: var(--sea-accent-strong); }
 .sea-app .sea-resize:focus-visible { outline: none; }
 
 .sea-mobile-only { display: none; }
@@ -228,11 +231,11 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
     transition: transform 0.2s ease, visibility 0s linear 0.2s;
   }
   .sea-sidebar.is-open {
-    transform: none; visibility: visible; box-shadow: 0 8px 32px rgba(48, 45, 56, 0.2);
+    transform: none; visibility: visible; box-shadow: 0 8px 32px rgba(26, 34, 41, 0.2);
     transition: transform 0.2s ease, visibility 0s;
   }
   .sea-resize { display: none; }
-  .sea-backdrop { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(48, 45, 56, 0.35); }
+  .sea-backdrop { display: block; position: fixed; inset: 0; z-index: 40; background: rgba(26, 34, 41, 0.35); }
   .sea-topbar-name { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .sea-sidebar { transition: none !important; } }
@@ -247,12 +250,12 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-msg-user { display: flex; justify-content: flex-end; }
 .sea-bubble {
   max-width: min(85%, 560px); padding: 10px 16px; border-radius: 18px 18px 4px 18px;
-  background: var(--sea-mist-light); color: var(--sea-ink); white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--sea-accent-tint); color: var(--sea-ink); white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .sea-msg-assistant {
-  /* answer content is unchanged; the toggle buttons inside use the accent instead of near-black */
+  /* answer content is unchanged; the toggle buttons inside use SEA green (with dark text) instead of near-black */
   --primary: var(--sea-accent);
-  --primary-foreground: #ffffff;
+  --primary-foreground: var(--sea-ink);
   position: relative;
 }
 .sea-msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
@@ -270,8 +273,8 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-msg-assistant .rounded-lg.border { max-width: 100%; overflow-x: auto; }
 
 /* answer source badges, in the palette */
-.sea-msg-assistant .answer-badge--verified { border-color: var(--sea-mist); background: var(--sea-mist-light); color: var(--sea-accent-strong); }
-.sea-msg-assistant .answer-badge--ai { border-color: var(--sea-blush); background: var(--sea-blush-light); color: var(--sea-ink); }
+.sea-msg-assistant .answer-badge--verified { border-color: #bfe6a8; background: var(--sea-accent-tint); color: var(--sea-accent-strong); }
+.sea-msg-assistant .answer-badge--ai { border-color: var(--sea-warn-border); background: var(--sea-warn-light); color: var(--sea-ink); }
 
 /* loading */
 .sea-loading { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--sea-ink-muted); }
@@ -290,10 +293,10 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-composer-box {
   display: flex; align-items: flex-end; gap: 8px; width: 100%; max-width: var(--sea-column); margin: 0 auto;
   padding: 8px 8px 8px 16px; border: 1px solid var(--sea-field-border); border-radius: 22px;
-  background: var(--sea-surface); box-shadow: 0 1px 2px rgba(48, 45, 56, 0.04);
+  background: var(--sea-surface); box-shadow: 0 1px 2px rgba(26, 34, 41, 0.04);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.sea-composer-box:focus-within { border-color: var(--sea-accent); box-shadow: var(--sea-focus); }
+.sea-composer-box:focus-within { border-color: var(--sea-accent-strong); box-shadow: var(--sea-focus); }
 .sea-composer-box[aria-busy="true"] { background: var(--sea-mist-light); border-color: var(--sea-mist); }
 .sea-composer-box textarea {
   flex: 1; min-width: 0; padding: 6px 0; border: 0; outline: none; resize: none; background: transparent;
@@ -304,10 +307,10 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-composer-box textarea:disabled { cursor: not-allowed; }
 .sea-send {
   display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0;
-  border: 0; border-radius: 50%; background: var(--sea-accent); color: #fff; cursor: pointer; transition: background-color 0.15s;
+  border: 0; border-radius: 50%; background: var(--sea-accent); color: var(--sea-ink); cursor: pointer; transition: background-color 0.15s;
 }
 .sea-send svg { width: 18px; height: 18px; }
-.sea-send:hover:not(:disabled) { background: var(--sea-accent-strong); }
+.sea-send:hover:not(:disabled) { background: var(--sea-accent-hover); }
 .sea-send:disabled { background: var(--sea-mist); color: var(--sea-ink-muted); cursor: not-allowed; }
 .sea-composer-hint { max-width: var(--sea-column); margin: 6px auto 0; text-align: center; font-size: var(--sea-text-xs); color: var(--sea-ink-muted); }
 
@@ -332,3 +335,4 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
   .sea-chat-item { padding-top: 12px; padding-bottom: 12px; }
   .sea-chat-delete { width: 40px; height: 40px; }
 }
+.sea-msg-assistant .query-data-table tbody tr:hover { background: var(--sea-accent-tint); }
