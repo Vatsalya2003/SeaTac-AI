@@ -1,164 +1,133 @@
-import React from 'react';
-import { Button } from './ui/button';
-import { ScrollArea } from './ui/scroll-area';
-import { Separator } from './ui/separator';
-import { Plus, MessageSquare, Trash2, Menu, X } from 'lucide-react';
+import { useEffect, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { PanelLeftClose, Plus, Trash2 } from 'lucide-react';
 import { cn } from './ui/utils';
 
-interface ChatHistory {
+export const SIDEBAR_MIN = 200;
+export const SIDEBAR_MAX = 420;
+export const SIDEBAR_DEFAULT = 260;
+const KEY_STEP = 16;
+
+export const clampSidebarWidth = (w: number) =>
+  Math.round(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, Number.isFinite(w) ? w : SIDEBAR_DEFAULT)));
+
+/** Below this width the sidebar is a slide-over panel (same breakpoint as seatac.css). */
+export const isMobileLayout = () => window.matchMedia('(max-width: 767px)').matches;
+
+export interface ChatSummary {
   id: string;
   title: string;
-  timestamp: string | Date;
-  preview: string;
 }
 
 interface ChatSidebarProps {
-  isCollapsed: boolean;
-  onToggle: () => void;
-  onNewChat: () => void;
+  chats: ChatSummary[];
   activeChat: string | null;
   onSelectChat: (id: string) => void;
-  // now the history is controlled by parent (App.tsx)
-  chatHistory: ChatHistory[];
+  onNewChat: () => void;
   onDeleteChat: (id: string) => void;
+  width: number;
+  onWidthChange: (width: number) => void;
+  collapsed: boolean;
+  onCollapse: () => void;
+  mobileOpen: boolean;
+  onCloseMobile: () => void;
 }
 
-// used for debug
-console.log('🔥 ChatSidebar loaded');
-
 export function ChatSidebar({
-  isCollapsed,
-  onToggle,
-  onNewChat,
-  activeChat,
-  onSelectChat,
-  chatHistory,
-  onDeleteChat,
+  chats, activeChat, onSelectChat, onNewChat, onDeleteChat,
+  width, onWidthChange, collapsed, onCollapse, mobileOpen, onCloseMobile,
 }: ChatSidebarProps) {
-  const deleteChat = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    onDeleteChat(id);
-    if (activeChat === id) {
-      onNewChat();
-    }
+  // Esc closes the slide-over panel on small screens
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onCloseMobile(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen, onCloseMobile]);
+
+  const hide = () => (isMobileLayout() ? onCloseMobile() : onCollapse());
+  const afterPick = () => { if (isMobileLayout()) onCloseMobile(); };
+
+  const startResize = (e: PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = width;
+    const move = (ev: globalThis.PointerEvent) => onWidthChange(clampSidebarWidth(startWidth + ev.clientX - startX));
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      document.body.classList.remove('sea-resizing');
+    };
+    document.body.classList.add('sea-resizing');
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
   };
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
+  const resizeWithKeys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const next = { ArrowLeft: width - KEY_STEP, ArrowRight: width + KEY_STEP, Home: SIDEBAR_MIN, End: SIDEBAR_MAX }[e.key];
+    if (next === undefined) return;
+    e.preventDefault();
+    onWidthChange(clampSidebarWidth(next));
   };
 
   return (
-    <div
-      className={cn(
-        'bg-gray-50/80 border-r border-gray-200 transition-all duration-300 ease-in-out flex flex-col  h-full',
-        isCollapsed ? 'w-16' : 'w-80'
-      )}
-    >
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={onToggle} className="h-8 w-8 p-0">
-            {isCollapsed ? <Menu className="h-4 w-4" /> : <X className="h-4 w-4" />}
-          </Button>
-
-          {!isCollapsed && (
-            <Button
-              onClick={onNewChat}
-              size="sm"
-              className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200"
-            >
-              <Plus className="h-4 w-4" />
-              New Chat
-            </Button>
-          )}
+    <>
+      {mobileOpen && <div className="sea-backdrop" onClick={onCloseMobile} aria-hidden="true" />}
+      <aside
+        id="chat-sidebar"
+        className={cn('sea-sidebar', collapsed && 'is-collapsed', mobileOpen && 'is-open')}
+        style={{ '--sea-sidebar-width': `${width}px` } as CSSProperties}
+        aria-label="Chats"
+      >
+        <div className="sea-sidebar-head">
+          <button type="button" className="sea-btn sea-btn-secondary sea-new-chat"
+                  onClick={() => { onNewChat(); afterPick(); }}>
+            <Plus aria-hidden="true" /> New chat
+          </button>
+          <button type="button" className="sea-icon-btn" onClick={hide} aria-label="Hide sidebar"
+                  title="Hide sidebar" data-testid="sidebar-collapse">
+            <PanelLeftClose aria-hidden="true" />
+          </button>
         </div>
-      </div>
 
-      {/* Chat History */}
-      {!isCollapsed && (
-        <>
-          <div className="px-4 py-3">
-            <h3 className="text-sm font-medium text-gray-600">Recent Chats</h3>
-          </div>
-          
-          <ScrollArea className="flex-1 px-2">
-            <div className="space-y-1">
-              {chatHistory.map((chat) => (
-                <div
-                  key={chat.id}
-                  onClick={() => onSelectChat(chat.id)}
-                  className={cn(
-                    'group relative flex flex-col p-3 pr-6 rounded-lg cursor-pointer transition-all duration-200',
-                    'hover:bg-white hover:shadow-sm',
-                    activeChat === chat.id && 'bg-white shadow-sm border border-gray-200'
-                  )}
-                >
-                  {/* Title */}
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-medium text-gray-900 truncate min-w-0 flex-1">
-                      {chat.title}
-                    </p>
-                  </div>
+        <h2 className="sea-sidebar-label">Recent chats</h2>
+        <ul className="sea-chat-list">
+          {chats.map((chat) => {
+            const active = chat.id === activeChat;
+            return (
+              <li key={chat.id} className={cn('sea-chat', active && 'is-active')}>
+                <button type="button" className="sea-chat-item" title={chat.title}
+                        aria-current={active ? 'true' : undefined}
+                        onClick={() => { onSelectChat(chat.id); afterPick(); }}>
+                  {chat.title}
+                </button>
+                <button type="button" className="sea-icon-btn sea-chat-delete"
+                        onClick={() => onDeleteChat(chat.id)}
+                        aria-label={`Delete chat: ${chat.title}`} title="Delete chat">
+                  <Trash2 aria-hidden="true" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
 
-                  {/* Preview */}
-                  <p className="text-xs text-gray-500 truncate mt-0.5 min-w-0">{chat.preview}</p>
-
-                  {/* Time and delete button */}
-                  <div className="mt-2 relative">
-                    <span className="text-xs text-gray-400">{formatTime(new Date(chat.timestamp))}</span>
-
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e: React.MouseEvent) => deleteChat(e, chat.id)}
-                      aria-label={`Delete chat ${chat.title}`}
-                      title="Delete chat"
-                      className="absolute right-0 top-0 h-6 w-6 p-0 text-gray-700 hover:text-red-600 transition-colors bg-white rounded-md z-[999]"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-
-        </>
-      )}
-
-      {/* Collapsed State */}
-      {isCollapsed && (
-        <div className="flex-1 flex flex-col items-center pt-4 space-y-2">
-          <Button onClick={onNewChat} variant="ghost" size="sm" className="h-10 w-10 p-0">
-            <Plus className="h-4 w-4" />
-          </Button>
-
-          <Separator className="w-8" />
-
-          <div className="space-y-1">
-            {chatHistory.slice(0, 3).map((chat) => (
-              <Button
-                key={chat.id}
-                variant="ghost"
-                size="sm"
-                onClick={() => onSelectChat(chat.id)}
-                className={cn('h-10 w-10 p-0', activeChat === chat.id && 'bg-white shadow-sm')}
-              >
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+        <div
+          className="sea-resize"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize sidebar"
+          aria-controls="chat-sidebar"
+          aria-valuemin={SIDEBAR_MIN}
+          aria-valuemax={SIDEBAR_MAX}
+          aria-valuenow={width}
+          tabIndex={0}
+          onPointerDown={startResize}
+          onKeyDown={resizeWithKeys}
+          onDoubleClick={() => onWidthChange(SIDEBAR_DEFAULT)}
+          title="Drag to resize (double-click to reset)"
+          data-testid="sidebar-resize"
+        />
+      </aside>
+    </>
   );
 }

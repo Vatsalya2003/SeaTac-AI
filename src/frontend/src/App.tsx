@@ -1,13 +1,12 @@
 import { queryAPI } from "./api/query";
 import { useState, useEffect, useRef } from 'react';
-import { ChatSidebar } from './components/ChatSidebar';
+import { ChatSidebar, SIDEBAR_DEFAULT, clampSidebarWidth, isMobileLayout } from './components/ChatSidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
 import { LoginPage } from './components/LoginPage';
 import { ScrollArea } from './components/ui/scroll-area';
-import { Button } from './components/ui/button';
-import { LogOut } from 'lucide-react';
+import { LogOut, PanelLeftOpen } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -33,6 +32,24 @@ interface ChatThread {
 }
 
 const STORAGE_KEY = 'aiport_chat_threads_v7_0_fixed';
+const SIDEBAR_WIDTH_KEY = 'seatac_sidebar_width';
+const SIDEBAR_COLLAPSED_KEY = 'seatac_sidebar_collapsed';
+
+// localStorage can be unavailable (private mode, blocked storage): the app still works without it
+const readSetting = (key: string): string | null => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+const writeSetting = (key: string, value: string) => {
+  try { localStorage.setItem(key, value); } catch { /* not saved */ }
+};
+
+// Sidebar title: the chat's first question as plain text (no markdown), or "New chat"
+const chatTitle = (thread: ChatThread): string => {
+  const first = thread.messages.find(m => m.role === 'user')?.content ?? '';
+  const text = (first || (thread.title === 'New Chat' ? '' : thread.title))
+    .replace(/[*_`#>|~]/g, '').replace(/\s+/g, ' ').trim();
+  return text ? (text.length > 80 ? `${text.slice(0, 79)}…` : text) : 'New chat';
+};
 
 export default function App() {
   // Login state
@@ -40,12 +57,19 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState('');
 
   // Chat state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSetting(SIDEBAR_COLLAPSED_KEY) === '1');
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    clampSidebarWidth(Number(readSetting(SIDEBAR_WIDTH_KEY) ?? SIDEBAR_DEFAULT)));
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Remember the sidebar width and collapsed state
+  useEffect(() => { writeSetting(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);
+  useEffect(() => { writeSetting(SIDEBAR_COLLAPSED_KEY, isSidebarCollapsed ? '1' : '0'); }, [isSidebarCollapsed]);
 
   // Check if already logged in
   useEffect(() => {
@@ -238,67 +262,79 @@ export default function App() {
     }
   };
 
+  const createThread = (): ChatThread => ({
+    id: Date.now().toString(),
+    title: 'New Chat',
+    messages: [],
+    lastUpdated: new Date().toString()
+  });
+
   const handleNewChat = () => {
-    const newThread: ChatThread = {
-      id: Date.now().toString(),
-      title: 'New Chat',
-      messages: [],
-      lastUpdated: new Date().toString()
-    };
-    
+    if (currentThread && currentThread.messages.length === 0) return;  // already on an empty chat
+    const newThread = createThread();
     setThreads(prev => [newThread, ...prev]);
     setActiveChat(newThread.id);
-    console.log('🆕 New chat:', newThread.id);
   };
 
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId);
-    console.log('📌 Selected:', chatId);
   };
 
   const handleDeleteChat = (chatId: string) => {
-    setThreads(prev => {
-      const remaining = prev.filter(t => t.id !== chatId);
-      if (activeChat === chatId) {
-        setActiveChat(remaining.length > 0 ? remaining[0].id : null);
-      }
-      return remaining;
-    });
+    const remaining = threads.filter(t => t.id !== chatId);
+    if (remaining.length === 0) {  // always keep one chat
+      const newThread = createThread();
+      setThreads([newThread]);
+      setActiveChat(newThread.id);
+      return;
+    }
+    setThreads(remaining);
+    if (activeChat === chatId) setActiveChat(remaining[0].id);
   };
+
+  const openSidebar = () => (isMobileLayout() ? setMobileSidebarOpen(true) : setIsSidebarCollapsed(false));
+  const sidebarVisible = mobileSidebarOpen || !isSidebarCollapsed;
 
   const isWelcomeView = messages.length === 0;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="sea-app">
       <ChatSidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        onNewChat={handleNewChat}
+        chats={threads.map(t => ({ id: t.id, title: chatTitle(t) }))}
         activeChat={activeChat}
         onSelectChat={handleSelectChat}
-        chatHistory={threads.map(t => ({
-          id: t.id,
-          title: t.title,
-          timestamp: t.lastUpdated,
-          preview: t.messages.length && t.messages[t.messages.length - 1]?.content
-            ? t.messages[t.messages.length - 1].content.slice(0, 80) 
-            : 'No messages yet'
-        }))}
+        onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
+        width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
+        collapsed={isSidebarCollapsed}
+        onCollapse={() => setIsSidebarCollapsed(true)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Header with user info and logout */}
-        <div className="border-b border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">SeaTac AI</h1>
-            <p className="text-xs text-gray-500">Logged in as {currentUser}</p>
+      <div className="sea-main">
+        <header className="sea-topbar">
+          <button
+            type="button"
+            className={`sea-icon-btn sea-menu-btn${isSidebarCollapsed ? '' : ' sea-mobile-only'}`}
+            onClick={openSidebar}
+            aria-label="Show sidebar"
+            aria-controls="chat-sidebar"
+            aria-expanded={sidebarVisible}
+            title="Show sidebar"
+            data-testid="sidebar-open"
+          >
+            <PanelLeftOpen aria-hidden="true" />
+          </button>
+          <h1 className="sea-topbar-title">SeaTac AI</h1>
+          <div className="sea-topbar-user">
+            <span className="sea-topbar-name">Signed in as {currentUser}</span>
+            <button type="button" className="sea-btn sea-btn-ghost sea-logout" onClick={handleLogout}>
+              <LogOut aria-hidden="true" /> Log out
+            </button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 px-3">
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
+        </header>
 
         {isWelcomeView ? (
           <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
