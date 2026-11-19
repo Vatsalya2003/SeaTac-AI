@@ -17,3 +17,13 @@
 .query-chart-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; font-size: 13px; color: #64748b; }
 .query-chart-filter label { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: #334155; font-weight: 500; }
 .query-chart-filter input { accent-color: #2563eb; width: 16px; height: 16px; }
+
+/* Answer source badge and markdown table wrapper: plain CSS, because index.css is a pre-built Tailwind
+   file and utility classes that aren't already in it have no effect. */
+.answer-badge { display: inline-flex; align-items: center; gap: 6px; margin-bottom: 8px; padding: 2px 10px;
+  border: 1px solid; border-radius: 999px; font-size: 12px; font-weight: 500; line-height: 20px; }
+.answer-badge-icon { width: 14px; height: 14px; flex-shrink: 0; }
+.answer-badge--verified { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
+.answer-badge--ai { border-color: #fcd34d; background: #fffbeb; color: #92400e; }
+.query-md-table { margin: 12px 0; border: 1px solid #e2e8f0; border-radius: 8px; background: white; overflow-x: auto; }
+.query-md-table .query-data-table { margin: 0; }

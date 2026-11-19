@@ -28,9 +28,9 @@ interface ChatMessageProps {
 // couldn't be given ('none', or no sql_source) get no badge.
 const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: typeof BadgeCheck }> = {
   template: { label: 'Verified answer', Icon: BadgeCheck,
-              className: 'border-green-200 bg-green-50 text-green-700' },
+              className: 'answer-badge--verified' },
   ai_sql: { label: 'AI-generated, not yet verified', Icon: Sparkles,
-            className: 'border-amber-300 bg-amber-50 text-amber-800' },
+            className: 'answer-badge--ai' },
 };
 
 function SourceBadge({ source }: { source?: string }) {
@@ -38,9 +38,8 @@ function SourceBadge({ source }: { source?: string }) {
   if (!badge) return null;
   const { label, className, Icon } = badge;
   return (
-    <div className={cn('mb-2 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium', className)}
-         data-testid="answer-source-badge">
-      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+    <div className={cn('answer-badge', className)} data-testid="answer-source-badge">
+      <Icon className="answer-badge-icon" aria-hidden="true" />
       {label}
     </div>
   );
@@ -74,7 +73,7 @@ const textOf = (node: any): string =>
 // Markdown tables use the same style as the data table (query-results.css); numbers are right-aligned.
 const markdownTables = {
   table: ({ node, ...props }: any) => (
-    <div className="not-prose my-3 rounded-lg border border-gray-200 bg-white overflow-x-auto">
+    <div className="query-md-table">
       <table className="query-data-table" {...props} />
     </div>
   ),
