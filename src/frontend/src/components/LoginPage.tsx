@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Eye, EyeOff, Loader2, Plane } from 'lucide-react';
 
 interface LoginPageProps {
   /** Checks the demo account (in App.tsx). Returns true when the login worked. */
   onLogin: (username: string, password: string) => boolean;
+  /** light/dark switch, shown in the top-right corner */
+  themeToggle?: ReactNode;
 }
 
 interface LoginErrors {
@@ -12,7 +14,7 @@ interface LoginErrors {
   form?: string;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, themeToggle }: LoginPageProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -50,6 +52,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <main className="sea-login">
+      {themeToggle && <div className="sea-login-theme">{themeToggle}</div>}
       <div className="sea-login-card">
         <div className="sea-login-brand">
           <span className="sea-logo" aria-hidden="true"><Plane /></span>

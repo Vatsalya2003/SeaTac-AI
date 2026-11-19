@@ -5,6 +5,20 @@
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
       <title>SeaTac AI</title>
+      <meta name="color-scheme" content="light dark" />
+      <script>
+        // apply the saved or system theme before the first paint (same logic as src/theme.tsx)
+        (function () {
+          try {
+            var t = localStorage.getItem('seatac_theme');
+            if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+            var r = document.documentElement;
+            r.dataset.theme = t;
+            if (t === 'dark') r.classList.add('dark');
+            r.style.colorScheme = t;
+          } catch (e) {}
+        })();
+      </script>
       <meta name="description" content="Ask about SeaTac airfield operations: taxi times, runway use, delays and peak hours." />
     </head>
 

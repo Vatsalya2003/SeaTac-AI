@@ -5,6 +5,7 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
 import { LoginPage } from './components/LoginPage';
+import { ThemeToggle, useTheme } from './theme';
 import { LogOut, PanelLeftOpen } from 'lucide-react';
 
 interface Message {
@@ -54,6 +55,8 @@ export default function App() {
   // Login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState('');
+
+  const { theme, toggleTheme } = useTheme();
 
   // Chat state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSetting(SIDEBAR_COLLAPSED_KEY) === '1');
@@ -150,7 +153,7 @@ export default function App() {
 
   // Show login page
   if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
+    return <LoginPage onLogin={handleLogin} themeToggle={<ThemeToggle theme={theme} onToggle={toggleTheme} />} />;
   }
 
   // Get current messages
@@ -346,6 +349,7 @@ export default function App() {
           </button>
           <h1 className="sea-topbar-title">SeaTac AI</h1>
           <div className="sea-topbar-user">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
             <span className="sea-topbar-name">Signed in as {currentUser}</span>
             <button type="button" className="sea-btn sea-btn-ghost sea-logout" onClick={handleLogout}>
               <LogOut aria-hidden="true" /> Log out

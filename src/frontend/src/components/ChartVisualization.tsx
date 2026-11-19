@@ -470,7 +470,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
       )}
 
       {/* Chart Canvas */}
-      <div className="relative bg-white rounded-lg p-4">
+      <div className="relative bg-white rounded-lg p-4 sea-chart-surface">
         <canvas ref={canvasRef} />
       </div>
 

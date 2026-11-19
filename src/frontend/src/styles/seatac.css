@@ -19,7 +19,9 @@
   --sea-warn-light: #fff6e5;   /* calm warm tint for the "not yet verified" badge */
   --sea-warn-border: #ecd3a0;
   --sea-field-border: #7c8790; /* input outlines: 3.7:1 on white (WCAG non-text contrast) */
-  --sea-surface: #ffffff;
+  --sea-surface: #ffffff;      /* page background */
+  --sea-card: #ffffff;         /* tables and cards inside answers */
+  --sea-on-accent: #1a2229;    /* text and icons on SEA green, in both themes */
   --sea-danger: #a23b3b;       /* error text, 6.5:1 on white */
   --sea-danger-light: #fbf1f1;
 
@@ -75,7 +77,7 @@ html, body {
 .sea-btn:disabled { cursor: not-allowed; opacity: 0.55; }
 .sea-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
 
-.sea-btn-primary { background: var(--sea-accent); color: var(--sea-ink); font-weight: 600; }
+.sea-btn-primary { background: var(--sea-accent); color: var(--sea-on-accent); font-weight: 600; }
 .sea-btn-primary:hover:not(:disabled) { background: var(--sea-accent-hover); }
 
 .sea-btn-secondary { background: var(--sea-surface); color: var(--sea-ink); border-color: var(--sea-mist); }
@@ -138,6 +140,8 @@ html, body {
 .sea-password { position: relative; }
 .sea-password .sea-input { padding-right: 48px; }
 .sea-password-toggle { position: absolute; top: 4px; right: 4px; }
+.sea-login { position: relative; }
+.sea-login-theme { position: absolute; top: 12px; right: 12px; }
 .sea-login-footer { font-size: var(--sea-text-xs); color: var(--sea-ink-muted); text-align: center; }
 @media (max-width: 480px) { .sea-login-card { padding: 28px 20px 24px; } }
 
@@ -255,7 +259,7 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-msg-assistant {
   /* answer content is unchanged; the toggle buttons inside use SEA green (with dark text) instead of near-black */
   --primary: var(--sea-accent);
-  --primary-foreground: var(--sea-ink);
+  --primary-foreground: var(--sea-on-accent);
   position: relative;
 }
 .sea-msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
@@ -307,7 +311,7 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-composer-box textarea:disabled { cursor: not-allowed; }
 .sea-send {
   display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; flex-shrink: 0;
-  border: 0; border-radius: 50%; background: var(--sea-accent); color: var(--sea-ink); cursor: pointer; transition: background-color 0.15s;
+  border: 0; border-radius: 50%; background: var(--sea-accent); color: var(--sea-on-accent); cursor: pointer; transition: background-color 0.15s;
 }
 .sea-send svg { width: 18px; height: 18px; }
 .sea-send:hover:not(:disabled) { background: var(--sea-accent-hover); }
@@ -336,3 +340,70 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
   .sea-chat-delete { width: 40px; height: 40px; }
 }
 .sea-msg-assistant .query-data-table tbody tr:hover { background: var(--sea-accent-tint); }
+
+/* ==== dark mode ============================================================================================
+   Turned on by data-theme="dark" on <html> (src/theme.tsx; index.html applies it before the first paint).
+   Same SEA green; text on green stays dark. Contrast on the page: text 14.7:1, muted 7.8:1, green text 9.9:1, input borders 3.6:1. */
+:root[data-theme="dark"] {
+  --sea-ink: #e6ebee;
+  --sea-ink-muted: #a3adb5;
+  --sea-accent: #4bca00;
+  --sea-accent-hover: #5fd61a;
+  --sea-accent-strong: #74d93a;  /* readable green on dark surfaces */
+  --sea-accent-tint: #1d2e17;
+  --sea-mist: #2c363e;
+  --sea-mist-light: #0d1216;     /* sidebar, a step darker than the page */
+  --sea-warn-light: #2e2716;
+  --sea-warn-border: #6e5a2c;
+  --sea-field-border: #66727c;
+  --sea-surface: #13191e;
+  --sea-card: #192127;
+  --sea-danger: #f19a9a;
+  --sea-danger-light: #2e1a1a;
+  --sea-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+  --sea-focus: 0 0 0 3px rgba(116, 217, 58, 0.35);
+}
+:root[data-theme="dark"] .sea-login-card { background: var(--sea-card); }
+:root[data-theme="dark"] .sea-login { background: var(--sea-mist-light); }
+:root[data-theme="dark"] .sea-input,
+:root[data-theme="dark"] .sea-chip,
+:root[data-theme="dark"] .sea-composer-box { background: var(--sea-card); }
+:root[data-theme="dark"] .sea-composer-box[aria-busy="true"] { background: var(--sea-surface); }
+:root[data-theme="dark"] .sea-chat-item:hover { background: rgba(255, 255, 255, 0.05); }
+:root[data-theme="dark"] .sea-chat.is-active .sea-chat-item { background: var(--sea-card); }
+:root[data-theme="dark"] .sea-form-alert { border-color: #5c2b2b; border-left-color: var(--sea-danger); }
+:root[data-theme="dark"] .sea-msg-assistant .answer-badge--verified { border-color: #355a24; }
+:root[data-theme="dark"] .sea-send:disabled { background: var(--sea-mist); color: var(--sea-ink-muted); }
+
+/* answer content in dark mode: the shared table CSS (query-results.css) and the Tailwind grey classes
+   used by the data table and buttons, remapped to the dark palette. The content itself is unchanged. */
+:root[data-theme="dark"] .sea-app .query-data-table th { background: #1f2930; color: var(--sea-ink-muted); border-bottom-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .query-data-table td { border-bottom-color: #232d34; color: var(--sea-ink); }
+:root[data-theme="dark"] .sea-app .query-data-table tbody tr:nth-child(even) { background: #1c252b; }
+:root[data-theme="dark"] .sea-app .query-data-table tbody tr:hover { background: var(--sea-accent-tint); }
+:root[data-theme="dark"] .sea-app .query-answer table th,
+:root[data-theme="dark"] .sea-app .query-answer table td { border-bottom-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .query-md-table { background: var(--sea-card); border-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .query-calculation-details { color: var(--sea-ink-muted); border-top-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .query-chart-filter { color: var(--sea-ink-muted); }
+:root[data-theme="dark"] .sea-app .query-chart-filter label { color: var(--sea-ink); }
+:root[data-theme="dark"] .sea-app .query-export,
+:root[data-theme="dark"] .sea-app .query-export > summary { color: var(--sea-ink); }
+:root[data-theme="dark"] .sea-app .query-export > summary { background: var(--sea-card); border-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .query-answer strong { color: var(--sea-ink); }
+
+:root[data-theme="dark"] .sea-app .bg-white { background-color: var(--sea-card); }
+:root[data-theme="dark"] .sea-app .bg-gray-50 { background-color: #1f2930; }
+:root[data-theme="dark"] .sea-app .bg-gray-100 { background-color: #232d34; }
+:root[data-theme="dark"] .sea-app .hover\:bg-gray-50:hover,
+:root[data-theme="dark"] .sea-app .hover\:bg-gray-100:hover { background-color: #232d34; }
+:root[data-theme="dark"] .sea-app .border-gray-200 { border-color: var(--sea-mist); }
+:root[data-theme="dark"] .sea-app .text-gray-900,
+:root[data-theme="dark"] .sea-app .text-gray-800 { color: var(--sea-ink); }
+:root[data-theme="dark"] .sea-app .text-gray-700,
+:root[data-theme="dark"] .sea-app .text-gray-600,
+:root[data-theme="dark"] .sea-app .text-gray-500,
+:root[data-theme="dark"] .sea-app .text-gray-400 { color: var(--sea-ink-muted); }
+
+/* charts are drawn on a canvas with dark labels, so they keep a light card in dark mode (exports stay white) */
+:root[data-theme="dark"] .sea-app .sea-chart-surface { background-color: #f4f6f5; }
