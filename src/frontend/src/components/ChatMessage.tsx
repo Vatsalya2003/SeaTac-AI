@@ -134,7 +134,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className="text-sm font-medium text-gray-900">
-            {message.role === 'user' ? 'You' : 'Gate Assistant'}
+            {message.role === 'user' ? 'You' : 'SeaTac AI'}
           </span>
           <span className="text-xs text-gray-500">
             {formatTime(message.timestamp)}

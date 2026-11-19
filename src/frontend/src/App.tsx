@@ -136,9 +136,9 @@ export default function App() {
             <div className="mx-auto bg-gradient-to-br from-blue-500 to-green-500 p-3 rounded-2xl w-fit">
               <Plane className="h-8 w-8 text-white" />
             </div>
-            <CardTitle className="text-2xl font-bold">AIport</CardTitle>
+            <CardTitle className="text-2xl font-bold">SeaTac AI</CardTitle>
             <CardDescription className="text-base">
-              AI-Powered Airport Operations Intelligence
+              Answers about SeaTac airfield operations
             </CardDescription>
           </CardHeader>
           
@@ -354,7 +354,7 @@ export default function App() {
         {/* Header with user info and logout */}
         <div className="border-b border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
           <div>
-            <h1 className="text-lg font-semibold text-gray-900">AIport Assistant</h1>
+            <h1 className="text-lg font-semibold text-gray-900">SeaTac AI</h1>
             <p className="text-xs text-gray-500">Logged in as {currentUser}</p>
           </div>
           <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 px-3">
@@ -385,7 +385,7 @@ export default function App() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-900">Gate Assistant</span>
+                          <span className="text-sm font-medium text-gray-900">SeaTac AI</span>
                           <span className="text-xs text-gray-500">typing...</span>
                         </div>
                         <div className="flex items-center gap-1">

@@ -299,7 +299,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
     const footerY = exportCanvas.height - 35;
     ctx.fillStyle = '#6b7280';
     ctx.font = 'bold 16px Inter, system-ui, sans-serif';
-    ctx.fillText('AIport Intelligence', padding, footerY);
+    ctx.fillText('SeaTac AI', padding, footerY);
     
     ctx.font = '16px Inter, system-ui, sans-serif';
     const dateText = new Date().toLocaleDateString('en-US', { 
@@ -310,7 +310,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
     ctx.fillText(dateText, exportCanvas.width - padding - ctx.measureText(dateText).width, footerY);
 
     const link = document.createElement('a');
-    link.download = `aiport-analysis-${Date.now()}.png`;
+    link.download = `seatac-ai-analysis-${Date.now()}.png`;
     link.href = exportCanvas.toDataURL('image/png', 1.0);
     link.click();
   };
@@ -319,7 +319,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
     if (!canvasRef.current) return;
 
     const link = document.createElement('a');
-    link.download = `aiport-chart-${Date.now()}.png`;
+    link.download = `seatac-ai-chart-${Date.now()}.png`;
     link.href = canvasRef.current.toDataURL('image/png');
     link.click();
   };
@@ -363,7 +363,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
 
     setTimeout(() => {
       const link = document.createElement('a');
-      link.download = `aiport-chart-highres-${Date.now()}.png`;
+      link.download = `seatac-ai-chart-highres-${Date.now()}.png`;
       link.href = exportCanvas.toDataURL('image/png');
       link.click();
       
