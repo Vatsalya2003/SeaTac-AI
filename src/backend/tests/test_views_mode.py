@@ -377,3 +377,24 @@ def test_every_reference_select_passes_the_runtime_guard(vm):
                 for index, statement in enumerate(statements, 1)
                 if not vm.check_view_sql(statement)[0]]
     assert not failures
+
+
+# ---- answer source label sent to the frontend badge (/api/query) ------------------------------------------------
+
+def _ask_endpoint(app, monkeypatch, sql, question):
+    monkeypatch.setattr(app, "agent_system", app.SeaTacAgent(FakeGenerator(sql), None, app.db_manager))
+    return asyncio.run(app.handle_query(app.QueryRequest(query=question)))
+
+
+def test_endpoint_labels_views_answers_ai_generated(app, monkeypatch):
+    sql = "SELECT runway, COUNT(*) AS flights FROM v_runway_occupancy WHERE exclusion_reason IS NULL GROUP BY runway ORDER BY runway"
+    r = _ask_endpoint(app, monkeypatch, sql, "flights per runway")
+    assert r.success and r.sql_source == "ai_sql"
+
+
+def test_endpoint_gives_no_label_to_rejected_sql_or_greetings(app, monkeypatch):
+    r = _ask_endpoint(app, monkeypatch, "DELETE FROM v_taxi_in", "delete everything")
+    assert not r.success and r.sql_source == "none"
+    monkeypatch.setattr(app, "greeting_handler", app.GreetingHandler(None))  # no AI client: built-in reply
+    r = _ask_endpoint(app, monkeypatch, "SELECT 1", "hi")
+    assert r.sql_source == "system"

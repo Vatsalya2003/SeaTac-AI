@@ -1217,6 +1217,16 @@ class QueryResponse(BaseModel):
     included_count: Optional[int] = None
     excluded: Optional[Dict[str, Any]] = None
 
+def answer_source(result: Dict[str, Any]) -> str:
+    """sql_source sent to the frontend, which shows it as a badge above the answer:
+    'template' = a tested query answered (templates mode) -> "Verified answer";
+    'ai_sql'   = AI-written SQL (views mode, the templates fallback, legacy mode) -> "AI-generated, not yet verified";
+    'none'     = the question couldn't be answered -> no badge. Greetings use 'system' (no badge)."""
+    if not result.get('success'):
+        return 'none'
+    return 'template' if result.get('sql_source') == 'template' else 'ai_sql'
+
+
 class HealthResponse(BaseModel):
     status: str
     model: str
@@ -2073,7 +2083,7 @@ async def handle_query(request: QueryRequest):
             chart=result.get('chart'),
             output_format=result.get('output_format'),
             output_confidence=result.get('output_confidence'),
-            sql_source=result.get('sql_source', 'generated'),  # Default to generic 'generated'
+            sql_source=answer_source(result),  # template / ai_sql / none: drives the answer badge
             metric=result.get('metric'),
             definition=result.get('definition'),
             included_count=result.get('included_count'),
