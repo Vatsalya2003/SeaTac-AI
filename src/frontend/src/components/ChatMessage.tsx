@@ -23,6 +23,45 @@ interface ChatMessageProps {
   message: Message;
 }
 
+// "**Answer** (N rows):" label lines (templates and views modes). The "**Answer:**" sentence is kept.
+const ROW_COUNT_LABEL = /^\*\*Answer\*\* \([\d,]+ rows?\)[^\n]*:[ \t]*\n?/gm;
+const isTableLine = (line: string) => line.trimStart().startsWith('|');
+
+// Removes the row-count labels. When the reply has data rows, also removes the last markdown table:
+// it holds the same rows as message.data, which is shown below as the sortable, exportable data table.
+// Every other table (e.g. Q4's arrivals/departures summary, Q7's by-taxiway table) stays in the text.
+function answerMarkdown(markdown: string, hasData: boolean): string {
+  const text = markdown.replace(ROW_COUNT_LABEL, '');
+  if (!hasData) return text;
+  const lines = text.split('\n');
+  let end = lines.length - 1;
+  while (end >= 0 && !isTableLine(lines[end])) end--;
+  if (end < 0) return text;
+  let start = end;
+  while (start > 0 && isTableLine(lines[start - 1])) start--;
+  lines.splice(start, end - start + 1);
+  return lines.join('\n');
+}
+
+const textOf = (node: any): string =>
+  typeof node === 'string' || typeof node === 'number' ? String(node)
+    : Array.isArray(node) ? node.map(textOf).join('')
+    : node?.props?.children !== undefined ? textOf(node.props.children) : '';
+
+// Markdown tables use the same style as the data table (query-results.css); numbers are right-aligned.
+const markdownTables = {
+  table: ({ node, ...props }: any) => (
+    <div className="not-prose my-3 rounded-lg border border-gray-200 bg-white overflow-x-auto">
+      <table className="query-data-table" {...props} />
+    </div>
+  ),
+  td: ({ node, children, ...props }: any) => (
+    <td className={/^-?[\d,]+(\.\d+)?$/.test(textOf(children).trim()) ? 'query-number' : undefined} {...props}>
+      {children}
+    </td>
+  ),
+};
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('table');
@@ -82,10 +121,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
         
         {/* Markdown content */}
         <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={hasData ? {
-            table: () => null,
-          } : undefined}>
-            {hasData ? answer.replace(/^\*\*Answer(?::\*\*|\*\*)[^\n]*(?:\n|$)/i, '') : answer}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownTables}>
+            {message.role === 'assistant' ? answerMarkdown(answer, hasData) : answer}
           </ReactMarkdown>
         </div>
 
