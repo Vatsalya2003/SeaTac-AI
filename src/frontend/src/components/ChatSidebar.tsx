@@ -1,4 +1,4 @@
-import { useEffect, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react';
 import { PanelLeftClose, Plus, Trash2 } from 'lucide-react';
 import { cn } from './ui/utils';
 
@@ -36,6 +36,16 @@ export function ChatSidebar({
   chats, activeChat, onSelectChat, onNewChat, onDeleteChat,
   width, onWidthChange, collapsed, onCollapse, mobileOpen, onCloseMobile,
 }: ChatSidebarProps) {
+  const newChatRef = useRef<HTMLButtonElement>(null);
+  const wasOpen = useRef(false);
+
+  // Small screens: opening the panel moves focus into it; closing returns focus to the header button
+  useEffect(() => {
+    if (mobileOpen) newChatRef.current?.focus();
+    else if (wasOpen.current) document.querySelector<HTMLButtonElement>('[data-testid="sidebar-open"]')?.focus();
+    wasOpen.current = mobileOpen;
+  }, [mobileOpen]);
+
   // Esc closes the slide-over panel on small screens
   useEffect(() => {
     if (!mobileOpen) return;
@@ -78,9 +88,11 @@ export function ChatSidebar({
         className={cn('sea-sidebar', collapsed && 'is-collapsed', mobileOpen && 'is-open')}
         style={{ '--sea-sidebar-width': `${width}px` } as CSSProperties}
         aria-label="Chats"
+        aria-modal={mobileOpen ? true : undefined}
+        role={mobileOpen ? 'dialog' : undefined}
       >
         <div className="sea-sidebar-head">
-          <button type="button" className="sea-btn sea-btn-secondary sea-new-chat"
+          <button ref={newChatRef} type="button" className="sea-btn sea-btn-secondary sea-new-chat"
                   onClick={() => { onNewChat(); afterPick(); }}>
             <Plus aria-hidden="true" /> New chat
           </button>

@@ -298,7 +298,18 @@ export default function App() {
     if (activeChat === chatId) setActiveChat(remaining[0].id);
   };
 
-  const openSidebar = () => (isMobileLayout() ? setMobileSidebarOpen(true) : setIsSidebarCollapsed(false));
+  // the clicked button disappears when the sidebar hides or shows, so focus moves to the matching one
+  const focusSoon = (selector: string) =>
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus());
+  const openSidebar = () => {
+    if (isMobileLayout()) return setMobileSidebarOpen(true);
+    setIsSidebarCollapsed(false);
+    focusSoon('[data-testid="sidebar-collapse"]');
+  };
+  const collapseSidebar = () => {
+    setIsSidebarCollapsed(true);
+    focusSoon('[data-testid="sidebar-open"]');
+  };
   const sidebarVisible = mobileSidebarOpen || !isSidebarCollapsed;
 
   const isWelcomeView = messages.length === 0;
@@ -314,7 +325,7 @@ export default function App() {
         width={sidebarWidth}
         onWidthChange={setSidebarWidth}
         collapsed={isSidebarCollapsed}
-        onCollapse={() => setIsSidebarCollapsed(true)}
+        onCollapse={collapseSidebar}
         mobileOpen={mobileSidebarOpen}
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />

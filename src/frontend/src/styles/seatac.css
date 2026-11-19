@@ -319,3 +319,16 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 /* slightly tighter cells so a five-column table fits the 760 px reading column */
 .sea-msg-assistant .query-data-table th { padding: 12px 14px; }
 .sea-msg-assistant .query-data-table td { padding: 10px 14px; }
+
+/* ---- small screens and touch ---------------------------------------------------------------------------- */
+.sea-composer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
+@media (max-width: 767px) {
+  .sea-composer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  .sea-topbar { padding: 0 8px; }
+  .sea-sidebar-head { padding-top: env(safe-area-inset-top); }
+}
+@media (pointer: coarse) {
+  .sea-icon-btn { width: 44px; height: 44px; }
+  .sea-chat-item { padding-top: 12px; padding-bottom: 12px; }
+  .sea-chat-delete { width: 40px; height: 40px; }
+}
