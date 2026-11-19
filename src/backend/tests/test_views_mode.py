@@ -335,7 +335,26 @@ def test_validated_reference_queries_are_loaded(vm):
     assert vm.REFERENCE_QUERIES in vm.SQL_REFERENCE_CONTEXT
     assert vm.REFERENCE_QUERY_INSTRUCTIONS in vm.SQL_REFERENCE_CONTEXT
     assert not re.search(r"(?im)^\s*USE\s+", vm.REFERENCE_QUERIES)
-    assert all(re.search(rf"(?m)^-- Q{q}(?:\D|$)", vm.REFERENCE_QUERIES) for q in range(1, 11))
+    source = vm.QUESTION_QUERIES.read_text(encoding="utf-8")  # section headings are comments: in the file only
+    assert all(re.search(rf"(?m)^-- Q{q}(?:\D|$)", source) for q in range(1, 11))
+
+
+def test_reference_prompt_has_no_comments_or_expected_values(vm):
+    # The file's comments hold the Port's expected answers (GT: lines); none of them may reach the AI prompt.
+    # Failure messages give counts only, never the values.
+    prompt = vm.REFERENCE_QUERIES
+    if "--" in prompt or "/*" in prompt or "*/" in prompt:
+        pytest.fail("comment markers left in the reference queries prompt")
+    if re.search(r"\bGT\b|ground truth|expected", prompt, re.I):
+        pytest.fail("expected-answer wording left in the reference queries prompt")
+    source = vm.QUESTION_QUERIES.read_text(encoding="utf-8")
+    comments = " ".join(re.findall(r"--(.*)$", source, re.M) + re.findall(r"/\*(.*?)\*/", source, re.S))
+    values = set(re.findall(r"\d[\d,]*\.\d+|\d{1,3}(?:,\d{3})+", comments))
+    if not values:
+        pytest.fail("no expected values found in the file's comments: this test would not catch a leak")
+    leaked = sum(1 for v in values if re.search(rf"(?<![\d.,]){re.escape(v)}(?![\d,]|\.\d)", vm.SQL_REFERENCE_CONTEXT))
+    if leaked:
+        pytest.fail(f"{leaked} expected value(s) from the comments appear in the SQL prompt")
 
 
 def test_every_reference_select_passes_the_runtime_guard(vm):

@@ -109,19 +109,40 @@ They are examples that guide SQL generation, not fixed queries to execute verbat
 - Adapt dates, filters, grouping and ordering to the user's wording.
 - If the user gives no date, use the current dataset's default reporting window:
   selection_time >= '2025-08-08 00:00:00' AND selection_time < '2025-08-09 00:00:00'.
-- Do not copy reference comments or semicolons into the generated SQL.
+- Do not copy semicolons into the generated SQL.
 - Never output USE, query the underlying flights table or read anything except the allowed views.
 """
 
 
+def strip_sql_comments(text):
+    """Remove /* */ blocks and -- comments (outside quoted strings), then drop blank lines."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    lines = []
+    for line in text.splitlines():
+        quote = None
+        for i, ch in enumerate(line):
+            if quote:
+                quote = None if ch == quote else quote
+            elif ch in "'\"":
+                quote = ch
+            elif line.startswith("--", i):
+                line = line[:i]
+                break
+        if line.strip():
+            lines.append(line.rstrip())
+    return "\n".join(lines)
+
+
 def load_reference_queries():
-    """Load the reviewed SQL examples. Fail at startup if the deployed file is missing or unsafe."""
-    text = QUESTION_QUERIES.read_text(encoding="utf-8").strip()
+    """Load the reviewed SQL examples without their comments: the comments hold the expected answers,
+    which must never reach the AI prompt. Fail at startup if the file is missing, empty or unsafe."""
+    text = strip_sql_comments(QUESTION_QUERIES.read_text(encoding="utf-8"))
     if not text:
         raise RuntimeError(f"Reference query file is empty: {QUESTION_QUERIES}")
     if re.search(r"(?im)^\s*USE\s+", text):
         raise RuntimeError(f"Reference query file must not contain USE statements: {QUESTION_QUERIES}")
-    return text
+    statements = [st.strip() for st in text.split(";") if st.strip()]
+    return "\n\n".join(f"{st};" for st in statements)
 
 
 REFERENCE_QUERIES = load_reference_queries()
