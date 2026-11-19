@@ -1251,15 +1251,26 @@ class DatabaseManager:
             'database': os.getenv('DB_NAME', 'AIplane')
         }
         if VIEWS_MODE:
-            # Prefer a dedicated views-only account when configured. For local
-            # development, reuse the existing DB credentials and only switch
-            # the database; generated SQL is still restricted to approved
-            # `seatac` views by views_mode.check_view_sql().
+            # Views and templates modes log in only as the read-only user (SELECT on the seatac views).
+            # Never falls back to DB_USER / DB_PASSWORD; DB_NAME is not used.
             self.db_config.update(
-                user=os.getenv('SEATAC_READER_USER') or self.db_config['user'],
-                password=os.getenv('SEATAC_READER_PASSWORD') or self.db_config['password'],
+                user=os.getenv('SEATAC_READER_USER') or 'seatac_reader',
+                password=os.getenv('SEATAC_READER_PASSWORD', ''),
                 database=views_mode.VIEWS_DATABASE,
             )
+    
+    def check_reader_login(self) -> None:
+        """Views and templates modes: raise a clear error if the read-only login is missing or fails."""
+        user = self.db_config['user']
+        if not self.db_config['password']:
+            raise RuntimeError(f"QUERY_MODE={QUERY_MODE} needs SEATAC_READER_PASSWORD in src/backend/.env "
+                               f"(password of the read-only MySQL user {user}). See docs/SETUP_GUIDE.md.")
+        try:
+            mysql.connector.connect(**self.db_config).close()
+        except Error as e:
+            raise RuntimeError(f"QUERY_MODE={QUERY_MODE}: can't log in to MySQL as the read-only user {user} "
+                               f"(error {getattr(e, 'errno', '?')}). Check SEATAC_READER_PASSWORD in "
+                               f"src/backend/.env, or run src/database/scripts/create_reader.py.") from None
     
     def test_connection(self) -> bool:
         try:
@@ -2101,6 +2112,8 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
+    if VIEWS_MODE:
+        db_manager.check_reader_login()  # stops the server with a clear error; never falls back to DB_USER
     print("\n" + "=" * 80)
     print("✈️  SeaTac Operations Intelligence - GEMINI + SEATAC VIEWS v8.0")
     print("=" * 80)
