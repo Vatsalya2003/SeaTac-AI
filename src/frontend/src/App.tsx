@@ -4,11 +4,10 @@ import { ChatSidebar } from './components/ChatSidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
+import { LoginPage } from './components/LoginPage';
 import { ScrollArea } from './components/ui/scroll-area';
 import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Plane, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -38,9 +37,6 @@ const STORAGE_KEY = 'aiport_chat_threads_v7_0_fixed';
 export default function App() {
   // Login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [currentUser, setCurrentUser] = useState('');
 
   // Chat state
@@ -104,86 +100,27 @@ export default function App() {
     }
   }, [threads]);
 
-  // Login handler
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-
+  // Login check (demo accounts, no real auth). Returns true when the login worked.
+  const handleLogin = (username: string, password: string): boolean => {
     if ((username === 'admin' && password === 'admin123') || 
         (username === 'guest' && password === 'guest123')) {
       setCurrentUser(username);
       setIsLoggedIn(true);
       localStorage.setItem('aiport_user', username);
-    } else {
-      setLoginError('Invalid credentials');
+      return true;
     }
+    return false;
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentUser('');
     localStorage.removeItem('aiport_user');
-    setUsername('');
-    setPassword('');
   };
 
   // Show login page
   if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="space-y-3 text-center pb-6">
-            <div className="mx-auto bg-gradient-to-br from-blue-500 to-green-500 p-3 rounded-2xl w-fit">
-              <Plane className="h-8 w-8 text-white" />
-            </div>
-            <CardTitle className="text-2xl font-bold">SeaTac AI</CardTitle>
-            <CardDescription className="text-base">
-              Answers about SeaTac airfield operations
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                  {loginError}
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium block">Username</label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium block">Password</label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              
-              <Button type="submit" className="w-full h-11 text-base font-medium">
-                Sign In
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   // Get current messages

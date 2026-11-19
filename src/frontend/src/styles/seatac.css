@@ -100,5 +100,40 @@ html, body {
 }
 .sea-input::placeholder { color: var(--sea-ink-muted); opacity: 1; }
 .sea-input:focus { outline: none; border-color: var(--sea-accent); box-shadow: var(--sea-focus); }
+.sea-app .sea-input:focus-visible, .sea-login .sea-input:focus-visible { outline: none; } /* the box-shadow ring is the focus state */
 .sea-input[aria-invalid="true"] { border-color: var(--sea-danger); }
 .sea-field-error { font-size: var(--sea-text-sm); color: var(--sea-danger); }
+
+.sea-btn-block { width: 100%; height: 44px; }
+.sea-spin { animation: sea-spin 0.9s linear infinite; }
+@keyframes sea-spin { to { transform: rotate(360deg); } }
+
+/* ---- login ---------------------------------------------------------------------------------------------- */
+.sea-login {
+  min-height: 100vh; min-height: 100dvh;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px;
+  padding: 32px 16px; background: var(--sea-mist-light);
+}
+.sea-login-card {
+  width: 100%; max-width: 400px; padding: 36px 32px 32px;
+  background: var(--sea-surface); border: 1px solid var(--sea-mist); border-radius: 16px; box-shadow: var(--sea-shadow);
+}
+.sea-login-brand { text-align: center; margin-bottom: 28px; }
+.sea-logo {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 14px;
+  border-radius: 12px; background: var(--sea-accent); color: #fff;
+}
+.sea-logo svg { width: 22px; height: 22px; }
+.sea-login-brand h1 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--sea-ink); }
+.sea-login-brand p { margin: 6px 0 0; font-size: 14px; color: var(--sea-ink-muted); }
+.sea-login-form { display: flex; flex-direction: column; gap: 18px; }
+.sea-login-form .sea-btn-block { margin-top: 6px; }
+.sea-form-alert {
+  padding: 10px 12px; border: 1px solid #ecc9c9; border-left: 3px solid var(--sea-danger); border-radius: var(--sea-radius-sm);
+  background: var(--sea-danger-light); color: var(--sea-danger); font-size: 14px; line-height: 1.45;
+}
+.sea-password { position: relative; }
+.sea-password .sea-input { padding-right: 48px; }
+.sea-password-toggle { position: absolute; top: 4px; right: 4px; }
+.sea-login-footer { font-size: var(--sea-text-xs); color: var(--sea-ink-muted); text-align: center; }
+@media (max-width: 480px) { .sea-login-card { padding: 28px 20px 24px; } }
