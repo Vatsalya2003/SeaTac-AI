@@ -18,7 +18,8 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 src_dir, out_file = sys.argv[1], sys.argv[2]
 
 load_dotenv(BACKEND_DIR / ".env")  # same settings for both copies; variables already set are kept
-os.environ.pop("QUERY_MODE", None)
+os.environ["QUERY_MODE"] = "legacy"  # set, not removed: app_optimized calls load_dotenv() again,
+                                     # which would bring back a QUERY_MODE from .env
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["CLAUDE_API_KEY"] = ""
 sys.path.insert(0, src_dir)

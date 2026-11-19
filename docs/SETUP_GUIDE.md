@@ -5,7 +5,7 @@
 > A step-by-step guide to get the app running locally. It takes about 15 minutes.
 > Background: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) · How the code works: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) · Database: [DB_SCHEMA.md](DB_SCHEMA.md)
 >
-> **Tested on 2026-10-01** on macOS (Apple Silicon) with MySQL 8.4.8, Python 3.12 and Node 22. The installs, the backend start and the frontend start all worked. **Baseline steps (Step 7) checked on 2026-10-20**: `build_aiplane_v2.py` output (1,061 flights, 11,975 events), the backend with Gemini (`gemini-2.5-flash`) connected to `AIplane_v2` (`/api/health` online), and the frontend loading. **Google shut down `gemini-2.5-flash` on 2026-10-16**; the default is now `gemini-3.6-flash`, which hasn't been re-tested here yet. Windows steps are written out but **⚠️ not tested yet**; if you're on Windows, please fix anything that's wrong.
+> **Tested on 2026-10-01** on macOS (Apple Silicon) with MySQL 8.4.8, Python 3.12 and Node 22. The installs, the backend start and the frontend start all worked. **Baseline steps (Step 7) checked on 2026-10-20**: `build_aiplane_v2.py` output (1,061 flights, 11,975 events), the backend with Gemini (`gemini-2.5-flash`) connected to `AIplane_v2` (`/api/health` online), and the frontend loading. **Google shut down `gemini-2.5-flash` on 2026-10-16**; the default is now `gemini-3.6-flash`, which hasn't been re-tested here yet. Windows steps are written out but **⚠️ not tested yet**; if you're on Windows, please fix anything that's wrong. **Step 8 (templates mode) was run on Windows 10 on 2026-11-13** with MySQL 8.0.41, Python 3.12, Git Bash and `gemini-3.6-flash`: 174 backend tests passed (after the 2026-11-14 rule change), and all 10 Port questions matched the ground truth in the chatbot.
 
 ---
 
@@ -101,7 +101,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-**Create `src/backend/.env`.** There's no template in the repo, so create the file by hand. Pick **one** of these two options.
+**Create `src/backend/.env`.** Copy the template `src/backend/.env.example` to `src/backend/.env` and fill it in, or create the file by hand. Pick **one** of these two options.
 
 **Option A: Gemini (free; recommended for teammates and required for baseline testing)**
 
@@ -272,6 +272,54 @@ To go back to the old data afterwards, set `DB_NAME=AIplane` and restart the bac
 
 ---
 
+## Step 8: Templates mode (Stage 2): tested answers for the Port's 10 questions
+
+In templates mode the AI **never writes SQL**. It only decides which of the Port's 10 questions you asked. The backend then runs a pre-written, tested query on the `seatac` views, so the same question always gives the same, correct answer. Anything else falls back to views mode, where the AI writes SQL. What changed and why is in [STAGE2_CHANGES.md](STAGE2_CHANGES.md).
+
+**You need:**
+- the `seatac` database (Step 6);
+- `SEATAC_READER_PASSWORD` in `src/backend/.env`;
+- the read-only user `seatac_reader` created with that password. Running the database tests once creates it (`cd src/database && pytest -q`), or run `python scripts/create_reader.py` in the `src/database` venv.
+
+**Start the backend in templates mode.** Set `QUERY_MODE` when you start the server, **not in `.env`**, because a `QUERY_MODE` line in `.env` breaks the legacy tests:
+
+```bash
+# macOS / Linux / Git Bash
+cd src/backend && source venv/bin/activate      # Git Bash on Windows: source venv/Scripts/activate
+QUERY_MODE=templates PYTHONUNBUFFERED=1 uvicorn app_optimized:app --port 8000
+```
+
+```powershell
+# Windows PowerShell
+cd src\backend; venv\Scripts\Activate.ps1
+$env:QUERY_MODE="templates"; $env:PYTHONUNBUFFERED=1; uvicorn app_optimized:app --port 8000
+```
+
+The startup log says templates mode is on. Leave `QUERY_MODE` unset for the old chatbot (`legacy`), or use `views` for Stage 1.
+
+**Try it** (frontend from Step 4). Each question uses at most 1 AI call. If Gemini is busy or over its limit, a keyword match picks the question instead, so these still work:
+
+| Question | A correct answer shows |
+|---|---|
+| What is the average taxi-in time by aircraft type? | 16 groups: B738 14.53 min (81), B737 14.20 (9), A359 7.29 (3), Unknown 99.00 (1) |
+| What is the average time from wheels-down to parking? | 12.20 min over 525 arrivals |
+| What is the average takeoff delay compared to the scheduled takeoff time? | 25.71 min over 533 departures |
+| What is the average runway occupancy time for arrivals and departures? | arrivals 25.69 s (521), departures 76.50 s (532) |
+| How many takeoffs and landings did each runway have? | 34R busiest: 512 take-offs + 23 landings, 1 missed approach on 34L |
+
+All 10 questions and their expected numbers are in `PRJ/TEN_GROUND_TRUTH_ANSWERS.md` and in the comments of [`src/database/sql/question_queries.sql`](../src/database/sql/question_queries.sql). For Q7 and Q10, the team rules from 2026-11-14 apply: Q7 = 1,053 flights and Q10 19:00 = 58, not the ground-truth file's 1,055 and 57. See [STAGE2_CHANGES.md §4](STAGE2_CHANGES.md#4-decisions-we-made-and-why).
+
+**Run the backend tests** (no AI calls; they need MySQL and the `seatac` database):
+
+```bash
+cd src/backend && source venv/bin/activate
+PYTHONUTF8=1 python -m pytest -q          # expect 174 passed
+```
+
+On Windows, `PYTHONUTF8=1` is required (PowerShell: `$env:PYTHONUTF8=1; python -m pytest -q`). Without it, `test_legacy_unchanged.py` fails reading emoji from `git show`.
+
+---
+
 ## Every day after the first setup
 
 ```bash
@@ -307,6 +355,10 @@ Stop either server with **Ctrl + C**.
 | `Address already in use` on port 8000 or 3000 | Another copy is running. macOS: `lsof -i :8000`, then `kill <PID>`. Windows: `netstat -ano \| findstr :8000`, then `taskkill /PID <PID> /F` |
 | `Unknown database 'AIplane'` | Step 2b didn't run, or failed. Run it again from the `SeaTac-AI` folder |
 | `Unknown collation: utf8mb4_0900_ai_ci` | You're on MariaDB or MySQL 5.x. Install MySQL 8+ |
+| Templates or views mode: `Access denied for user 'seatac_reader'` | `seatac_reader` doesn't exist yet, or its password differs from `SEATAC_READER_PASSWORD` in `.env`. Run the database tests once, or `scripts/create_reader.py` (Step 8) |
+| In templates mode an answer has no "**Sample:** based on ..." line, and the log shows `-> stage 1 (views mode)` | The question didn't match one of the 10 Port questions, so views mode (AI-written SQL) answered. Rephrase it closer to the 10 questions |
+| 5 tests in `test_legacy_unchanged.py` fail | `QUERY_MODE` is set in `src/backend/.env`. Remove that line and set it on the command line instead (Step 8) |
+| Tests fail with `UnicodeDecodeError: 'charmap' codec` on Windows | Run pytest with `PYTHONUTF8=1` (Step 8) |
 
 ## Things that look like setup steps but aren't
 

@@ -28,7 +28,12 @@ SeaTac-AI/
 │   └── legacy/DB_SCHEMA_TEAM6.md      Team 6's `AIplane` schema (still used by the chatbot)
 └── src/
     ├── backend/
-    │   ├── app_optimized.py           ★ LIVE server (v8.0): Claude writes the SQL directly
+    │   ├── app_optimized.py           ★ LIVE server (v8.0). QUERY_MODE picks legacy / views / templates (§3)
+    │   ├── views_mode.py              Stage 1 (QUERY_MODE=views): AI-written SQL on the seatac views, checked, answer written in code
+    │   ├── templates.py               ★ Stage 2 (QUERY_MODE=templates): the tested queries + answer text for Port Q1–Q10
+    │   ├── intent.py                  ★ Stage 2: one AI call picks Q1–Q10 (JSON only), keyword match if the AI fails
+    │   ├── tests/                     Backend pytest suite (legacy unchanged, views mode, templates mode; no AI calls)
+    │   ├── .env.example               Template for src/backend/.env (copy it; never commit .env)
     │   ├── app.py                     Older server (v7.4): Modal CodeLlama writes SQL, Claude checks it
     │   ├── requirements.txt           Backend Python packages
     │   ├── Procfile, railway.json     Railway deployment (runs app_optimized)
@@ -47,6 +52,7 @@ SeaTac-AI/
     │   ├── scripts/create_reader.py   Creates the read-only `seatac_reader` user (SELECT on the views only)
     │   ├── tests/                     ★ Automated tests for `seatac` (pytest, §2.8)
     │   ├── sql/seatac_views.sql       ★ The metric views (Samer's definitions)
+    │   ├── sql/question_queries.sql   ★ Reference SQL for Port Q1–Q10 with the ground-truth numbers (same logic as templates.py)
     │   ├── metric_rules.yaml          ★ Metric definitions, groupings, limits; Q1–Q10 → metric
     │   ├── requirements.txt           Packages for the database scripts
     │   ├── scripts/db_manager.py      Old Excel → MySQL import tool (currently broken; see §2.5)
@@ -98,7 +104,7 @@ Then set `DB_USER=seatac_ro` and `DB_PASSWORD=...` in `src/backend/.env`.
 
 ### 2.3 Backend environment variables (full reference)
 
-These are **all** the variables the live server reads (`app_optimized.py:58-59`, `:1167-1171`). There's no template file.
+These are **all** the variables the live server reads (`app_optimized.py:58-59`, `:1167-1171`). A template with blank secrets is in `src/backend/.env.example`.
 
 ```env
 CLAUDE_API_KEY=sk-ant-...              # required
@@ -120,6 +126,20 @@ GEMINI_MODEL=gemini-3.6-flash        # optional; this is the default (gemini-2.5
 
 - A small `GeminiClient` adapter in `app_optimized.py` mimics `client.messages.create(...)`, so the three call sites (greeting, SQL, summary) didn't change. It also needs `google-genai` (now in `requirements.txt`).
 - The prompts are still the Claude-tuned ones, and free-tier Gemini quotas are small (each question uses 2 calls).
+
+**Query mode and the read-only user (views and templates modes):**
+
+```env
+SEATAC_READER_PASSWORD=...           # in .env: password of seatac_reader (SELECT on the seatac views only)
+```
+
+```bash
+QUERY_MODE=templates                 # set on the command line, NOT in .env: legacy (default) | views | templates
+```
+
+- `legacy` is Team 6's chatbot on `DB_NAME`, unchanged. `views` is Stage 1: the AI writes SQL on the `seatac` views (`views_mode.py`). `templates` is Stage 2: the AI only picks one of the 10 Port questions and a tested query answers it (`templates.py`, `intent.py`). Anything else falls back to views mode.
+- Views and templates modes connect as `seatac_reader` to the `seatac` database, whatever `DB_USER` / `DB_NAME` say.
+- Keep `QUERY_MODE` out of `.env`. `app_optimized.py` calls `load_dotenv()` on import, which would put it back after `test_legacy_unchanged.py` removes it, and 5 tests fail.
 
 For the older `app.py` only: `MODAL_ENDPOINT=<url>` and `USE_MODAL_MODEL=true` (see §2.6).
 
@@ -212,6 +232,21 @@ pytest -q
 
 **Run part of the suite:** `pytest -q tests/test_03_rules.py`, or `pytest -q -k midnight`.
 
+**Backend tests** (`src/backend/tests/`, 174 tests). They need MySQL, the `seatac` database and `seatac_reader`, and **never call an AI API** (fake intent clients stand in for the AI):
+
+```bash
+cd src/backend && source venv/bin/activate
+PYTHONUTF8=1 python -m pytest -q
+```
+
+| File | What it checks |
+|---|---|
+| `test_legacy_unchanged.py` | Legacy mode behaves exactly like the committed code (snapshot in `legacy_snapshot.py`) |
+| `test_views_mode.py` | Stage 1: the SQL checks, the read-only connection, the answer text written in code |
+| `test_templates.py` | Stage 2: every Q1–Q10 number against `PRJ/TEN_GROUND_TRUTH_ANSWERS.md`; the same question gives the same SQL twice; values passed as `%s` parameters; invalid intents; another date gives "No data"; the answer layout; intent JSON validation; keyword routing for all 20 ground-truth phrasings; fallback to views mode labelled `ai_sql` |
+
+On Windows, `PYTHONUTF8=1` is required, otherwise `test_legacy_unchanged.py` fails decoding emoji in `git show` output. **When you change a template**, change `src/database/sql/question_queries.sql` the same way, and update the expected numbers in `test_templates.py` only from the ground-truth file, never from the SQL output.
+
 **When you change a view or a rule:** update `tests/excel_expected.py` from the rules document, not from the SQL, so the two stay independent. After adding a view, add it to `VIEWS` in `tests/conftest.py` (a test fails until you do).
 
 **Schema file for the ER diagram:** after a schema change, regenerate the structure-only export and check it has no data:
@@ -270,6 +305,23 @@ ChatMessage.tsx shows Markdown text + chart/table toggle (+ CSV/PNG export); the
 10. **Choose output.** `OutputFormatClassifier` (`:1015`) scores keywords such as "chart", "table" and "how many" to choose text, chart and/or table. `ChartGenerator` (`:1236`) guesses a label column and a value column from the first row. It makes a **line** chart if the label column contains "hour", otherwise a **bar** chart, using at most 24 points. In practice the table data is always included (`:1707`).
 11. **Response** (`QueryResponse`, `:1134`): `success`, `message`, `data`, `chart`, `row_count`, `sql_queries`, `sql_source`, `output_format`, and so on. The generated SQL is returned but **not shown in the UI**.
 12. **Frontend displays it.** `query.ts` renames `data` to `tableData`. [`ChatMessage.tsx`](../src/frontend/src/components/ChatMessage.tsx) renders the message as Markdown, then shows a chart/table toggle. [`ChartVisualization.tsx`](../src/frontend/src/components/ChartVisualization.tsx) supports PNG export, and [`DataTableWithExport.tsx`](../src/frontend/src/components/DataTableWithExport.tsx) supports CSV export. The thread is saved to `localStorage`.
+
+### The templates-mode path (QUERY_MODE=templates, Stage 2)
+
+```
+handle_query ─► greeting check ─► SeaTacAgent._process_template_query
+                                     1. intent.parse(): 1 AI call -> {"question": "Q1".."Q10" | "other", "date"}
+                                        (AI error/quota -> keyword match; "other"/invalid JSON -> None)
+                                     2. templates.answer(qid, run, day): tested SQL with %s params, as seatac_reader
+                                     3. answer text written in code: headline, table, Sample, Definition, notes
+                                     None or IntentError ─► views mode (AI-written SQL), sql_source = "ai_sql"
+◄── same JSON as other modes + metric, definition, included_count, excluded; sql_source = "template", use_case = "Q1".."Q10"
+```
+
+- The answer text uses the same layout as views mode (`views_mode.build_answer`), plus one headline sentence.
+- The default day is 2025-08-08 (`templates.DEFAULT_DAY`). Any other date answers "No data for <date>".
+- Team rules chosen 2026-11-14: Q7 selects the day by the proxy `selection_time` (1,053 flights), and Q10 uses `v_peak_hours`, which counts the take-off with no runway (19:00 = 58). See [STAGE2_CHANGES.md §4](STAGE2_CHANGES.md#4-decisions-we-made-and-why).
+- Why and what is still open: [STAGE2_CHANGES.md](STAGE2_CHANGES.md).
 
 **Other endpoints:** `GET /` (version info), `GET /api/health` (Claude and DB status), `GET /docs` (FastAPI's automatic docs). The Fall 2025 endpoints `/api/stats` and `/api/db/*` **no longer exist**, although the README still lists `/api/stats`.
 
