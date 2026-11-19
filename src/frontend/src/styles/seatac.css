@@ -1,0 +1,104 @@
+/*
+ * SeaTac AI design system: palette, type and the app's components, in plain CSS.
+ * index.css is a pre-built Tailwind file: utility classes that aren't already in it have no effect,
+ * so new styles go here instead of new Tailwind classes. Loaded after index.css (src/main.tsx).
+ */
+
+/* ---- tokens --------------------------------------------------------------------------------------------- */
+:root {
+  /* palette */
+  --sea-ink: #302d38;          /* Deep Charcoal Plum: text, 13.5:1 on white */
+  --sea-ink-muted: #6b6775;    /* secondary text, 5.5:1 on white */
+  --sea-accent: #6072a6;       /* Muted Slate Blue: buttons, links, focus; white text on it 4.7:1 */
+  --sea-accent-strong: #4e5e8f;/* accent hover / accent text on tinted surfaces, 6.3:1 on white */
+  --sea-mist: #d1d9e4;         /* Cool Mist Blue: borders and dividers */
+  --sea-mist-light: #eef1f6;   /* surfaces: sidebar, user bubble, chips */
+  --sea-blush: #cbb6b2;        /* Dusty Blush: small highlights only */
+  --sea-blush-light: #f6f0ef;  /* blush tint for the "not yet verified" badge */
+  --sea-field-border: #8e93a3; /* input outlines: 3.1:1 on white (WCAG non-text contrast) */
+  --sea-surface: #ffffff;
+  --sea-danger: #a23b3b;       /* error text, 6.5:1 on white */
+  --sea-danger-light: #fbf1f1;
+
+  /* type */
+  --sea-font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --sea-text: 15px;
+  --sea-text-sm: 13px;
+  --sea-text-xs: 12px;
+  --sea-leading: 1.6;
+
+  /* shape and space */
+  --sea-radius: 12px;
+  --sea-radius-sm: 8px;
+  --sea-radius-pill: 999px;
+  --sea-shadow: 0 1px 2px rgba(48, 45, 56, 0.06), 0 4px 16px rgba(48, 45, 56, 0.06);
+  --sea-column: 760px;
+  --sea-focus: 0 0 0 3px rgba(96, 114, 166, 0.35);
+}
+
+/* ---- base ----------------------------------------------------------------------------------------------- */
+html, body {
+  font-family: var(--sea-font);
+  color: var(--sea-ink);
+  background: var(--sea-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+.sea-app, .sea-login {
+  font-size: var(--sea-text);
+  line-height: var(--sea-leading);
+  color: var(--sea-ink);
+}
+
+/* visible keyboard focus everywhere; mouse clicks don't show it */
+.sea-app :focus-visible, .sea-login :focus-visible {
+  outline: 2px solid var(--sea-accent);
+  outline-offset: 2px;
+}
+
+.sea-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ---- buttons -------------------------------------------------------------------------------------------- */
+.sea-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 16px;
+  border: 1px solid transparent; border-radius: var(--sea-radius-sm);
+  font: inherit; font-size: 14px; font-weight: 500; line-height: 1;
+  cursor: pointer; transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.sea-btn:disabled { cursor: not-allowed; opacity: 0.55; }
+.sea-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+.sea-btn-primary { background: var(--sea-accent); color: #fff; }
+.sea-btn-primary:hover:not(:disabled) { background: var(--sea-accent-strong); }
+
+.sea-btn-secondary { background: var(--sea-surface); color: var(--sea-ink); border-color: var(--sea-mist); }
+.sea-btn-secondary:hover:not(:disabled) { background: var(--sea-mist-light); }
+
+.sea-btn-ghost { background: transparent; color: var(--sea-ink-muted); }
+.sea-btn-ghost:hover:not(:disabled) { background: var(--sea-mist-light); color: var(--sea-ink); }
+
+.sea-icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; padding: 0; flex-shrink: 0;
+  border: 0; border-radius: var(--sea-radius-sm); background: transparent;
+  color: var(--sea-ink-muted); cursor: pointer;
+}
+.sea-icon-btn:hover:not(:disabled) { background: var(--sea-mist-light); color: var(--sea-ink); }
+.sea-icon-btn svg { width: 18px; height: 18px; }
+
+/* ---- form fields ---------------------------------------------------------------------------------------- */
+.sea-field { display: flex; flex-direction: column; gap: 6px; }
+.sea-label { font-size: 14px; font-weight: 500; color: var(--sea-ink); }
+.sea-input {
+  width: 100%; height: 44px; padding: 0 12px;
+  border: 1px solid var(--sea-field-border); border-radius: var(--sea-radius-sm);
+  background: var(--sea-surface); color: var(--sea-ink); font: inherit; font-size: var(--sea-text);
+}
+.sea-input::placeholder { color: var(--sea-ink-muted); opacity: 1; }
+.sea-input:focus { outline: none; border-color: var(--sea-accent); box-shadow: var(--sea-focus); }
+.sea-input[aria-invalid="true"] { border-color: var(--sea-danger); }
+.sea-field-error { font-size: var(--sea-text-sm); color: var(--sea-danger); }
