@@ -102,13 +102,14 @@ RULES
 """
 
 REFERENCE_QUERY_INSTRUCTIONS = """VALIDATED REFERENCE QUERIES
-The Q1-Q10 queries below were independently checked against the original Excel export.
+The Q1-Q10 queries below were checked against our ground truth file.
 They are examples that guide SQL generation, not fixed queries to execute verbatim.
 - Choose only the example or calculation relevant to the user's question.
 - Return one SELECT statement, even when the reference file shows several variants for one question.
 - Adapt dates, filters, grouping and ordering to the user's wording.
-- If the user gives no date, use the current dataset's default reporting window:
-  selection_time >= '2025-08-08 00:00:00' AND selection_time < '2025-08-09 00:00:00'.
+- If the user gives no date, use the dataset's default reporting day, 2025-08-08:
+  selection_date = '2025-08-08' on the per-flight views, and
+  local_date = '2025-08-08' on v_peak_hours and v_movement_area_hourly_peak.
 - Do not copy semicolons into the generated SQL.
 - Never output USE, query the underlying flights table or read anything except the allowed views.
 """
