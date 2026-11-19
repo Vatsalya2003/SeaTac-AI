@@ -301,7 +301,7 @@ export default function App() {
         </div>
 
         {isWelcomeView ? (
-          <ChatWelcome />
+          <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
         ) : (
           <>
             <div className="flex-1 overflow-hidden">

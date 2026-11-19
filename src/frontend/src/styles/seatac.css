@@ -137,3 +137,26 @@ html, body {
 .sea-password-toggle { position: absolute; top: 4px; right: 4px; }
 .sea-login-footer { font-size: var(--sea-text-xs); color: var(--sea-ink-muted); text-align: center; }
 @media (max-width: 480px) { .sea-login-card { padding: 28px 20px 24px; } }
+
+/* ---- empty state ---------------------------------------------------------------------------------------- */
+.sea-welcome {
+  width: 100%; max-width: var(--sea-column); margin: auto; padding: 48px 24px 24px;
+  text-align: center; color: var(--sea-ink);
+}
+.sea-welcome h2 { margin: 0; font-size: 26px; font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; }
+.sea-welcome > p { margin: 10px auto 0; max-width: 520px; color: var(--sea-ink-muted); }
+.sea-chips {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
+  margin: 32px 0 0; padding: 0; list-style: none; text-align: left;
+}
+.sea-chip {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 52px;
+  padding: 10px 14px; border: 1px solid var(--sea-mist); border-radius: var(--sea-radius);
+  background: var(--sea-surface); color: var(--sea-ink); font: inherit; font-size: 14px; line-height: 1.35; text-align: left;
+  cursor: pointer; transition: background-color 0.15s, border-color 0.15s;
+}
+.sea-chip svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--sea-ink-muted); transition: color 0.15s; }
+.sea-chip:hover:not(:disabled) { background: var(--sea-mist-light); border-color: var(--sea-blush); }
+.sea-chip:hover:not(:disabled) svg { color: var(--sea-accent); }
+.sea-chip:disabled { cursor: not-allowed; opacity: 0.55; }
+@media (max-width: 480px) { .sea-welcome { padding: 32px 16px 16px; } .sea-welcome h2 { font-size: 22px; } }
