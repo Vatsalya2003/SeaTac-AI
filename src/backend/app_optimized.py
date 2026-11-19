@@ -325,7 +325,7 @@ SQL Query:"""
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=1000,
-                temperature=0.1,
+                temperature=0 if VIEWS_MODE else 0.1,  # views/templates: deterministic SQL; legacy unchanged
                 messages=[{"role": "user", "content": sql_prompt}]
             )
             
@@ -1156,31 +1156,28 @@ LIMIT 100
 
 class GeminiClient:
     """Minimal stand-in for the Anthropic client so the rest of this file can keep
-    calling client.messages.create(...). Uses Gemini's current Interactions API
-    and supports the single-turn text prompts used by this application."""
+    calling client.messages.create(...). Supports single-turn text prompts only."""
 
     def __init__(self, api_key: str, model: str):
         from google import genai
+        from google.genai import types
         self._client = genai.Client(api_key=api_key)
+        self._types = types
         self.model = model
         self.messages = SimpleNamespace(create=self._create)
 
     def _create(self, model=None, max_tokens=1000, temperature=None, messages=None, **_):
         prompt = "\n\n".join(m["content"] for m in (messages or []) if isinstance(m.get("content"), str))
-        interaction = self._client.interactions.create(
-            model=self.model,
-            input=prompt,
-            store=False,
-            generation_config={
-                # SQL generation is deterministic and does not need Gemini's
-                # default medium reasoning, which can add substantial latency.
-                'thinking_level': 'minimal',
-                'max_output_tokens': max(max_tokens, 2048),
-            },
+        config = self._types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max(max_tokens, 2048),  # Gemini's thinking tokens count against this limit
+            automatic_function_calling=self._types.AutomaticFunctionCallingConfig(disable=True),  # no tools used
         )
-        if not interaction.output_text:
-            raise RuntimeError(f"Gemini returned no text (status={interaction.status})")
-        return SimpleNamespace(content=[SimpleNamespace(text=interaction.output_text)])
+        response = self._client.models.generate_content(model=self.model, contents=prompt, config=config)
+        if not response.text:
+            reason = response.candidates[0].finish_reason if response.candidates else response.prompt_feedback
+            raise RuntimeError(f"Gemini returned no text ({reason})")
+        return SimpleNamespace(content=[SimpleNamespace(text=response.text)])
 
 
 # Initialize the LLM client. The name claude_client is kept for compatibility;
@@ -1222,12 +1219,7 @@ class QueryResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     status: str
-    provider: str
     model: str
-    query_mode: str
-    database: str
-    ai_enabled: bool
-    gemini_enabled: bool
     modal_enabled: bool
     modal_endpoint: Optional[str]
     claude_enabled: bool
@@ -2096,15 +2088,10 @@ async def handle_query(request: QueryRequest):
 async def health_check():
     return HealthResponse(
         status="healthy",
-        provider=LLM_PROVIDER,
         model=ACTIVE_MODEL,
-        query_mode=QUERY_MODE,
-        database=db_manager.db_config['database'],
-        ai_enabled=bool(claude_client),
-        gemini_enabled=LLM_PROVIDER == 'gemini' and bool(claude_client),
         modal_enabled=False,  # Disabled for speed
         modal_endpoint=None,
-        claude_enabled=LLM_PROVIDER == 'claude' and bool(claude_client),
+        claude_enabled=bool(claude_client),
         database_status="online" if db_manager.test_connection() else "offline",
         version="8.0.0"
     )
