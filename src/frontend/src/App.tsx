@@ -5,7 +5,6 @@ import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
 import { LoginPage } from './components/LoginPage';
-import { ScrollArea } from './components/ui/scroll-area';
 import { LogOut, PanelLeftOpen } from 'lucide-react';
 
 interface Message {
@@ -64,7 +63,7 @@ export default function App() {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   // Remember the sidebar width and collapsed state
@@ -117,12 +116,19 @@ export default function App() {
     }
   }, [threads, isLoggedIn]);
 
-  // Auto-scroll
+  // Scrolling: a new question or the loading indicator scrolls to the bottom; a new answer scrolls to the
+  // top of that answer, so the one-sentence answer and its badge are in view (long tables follow below).
+  const activeMessages = threads.find(t => t.id === activeChat)?.messages ?? [];
+  const lastMessage = activeMessages[activeMessages.length - 1];
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!lastMessage) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (lastMessage.role === 'assistant') {
+      document.getElementById(`msg-${lastMessage.id}`)?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
     }
-  }, [threads]);
+  }, [lastMessage?.id, isTyping]);
 
   // Login check (demo accounts, no real auth). Returns true when the login worked.
   const handleLogin = (username: string, password: string): boolean => {
@@ -336,50 +342,26 @@ export default function App() {
           </div>
         </header>
 
-        {isWelcomeView ? (
-          <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
-        ) : (
-          <>
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea ref={scrollAreaRef} className="h-full">
-                <div className="max-w-4xl mx-auto">
-                  {messages.map((message) => (
-                    <ChatMessage key={message.id} message={message} />
-                  ))}
-                  
-                  <div ref={bottomRef} />
-                  
-                  {isTyping && (
-                    <div className="flex gap-4 p-6 bg-gray-50/30">
-                      <div className="flex-shrink-0">
-                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                          <span className="text-sm font-medium text-green-700">AI</span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-900">SeaTac AI</span>
-                          <span className="text-xs text-gray-500">typing...</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+        <div className="sea-scroll" ref={scrollRef}>
+          {isWelcomeView ? (
+            <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
+          ) : (
+            <div className="sea-thread">
+              {messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              {isTyping && (
+                <div className="sea-loading" role="status">
+                  <span className="sea-dots" aria-hidden="true"><i /><i /><i /></span>
+                  Looking up the data…
                 </div>
-              </ScrollArea>
+              )}
+              <div ref={bottomRef} />
             </div>
-          </>
-        )}
+          )}
+        </div>
 
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          disabled={isTyping}
-          isTyping={isTyping}
-        />
+        <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
       </div>
     </div>
   );

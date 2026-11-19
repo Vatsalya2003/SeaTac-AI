@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Avatar, AvatarFallback } from './ui/avatar';
 import { Copy, Check, BarChart3, Table as TableIcon, BadgeCheck, Sparkles } from 'lucide-react';
 import { cn } from './ui/utils';
 import ChartVisualization from './ChartVisualization';
@@ -109,39 +108,22 @@ export function ChatMessage({ message }: ChatMessageProps) {
     });
   };
 
-  console.log('🎨 ChatMessage rendering:', message);
+  if (message.role === 'user') {
+    return (
+      <div className="sea-msg sea-msg-user" id={`msg-${message.id}`}>
+        <div className="sea-bubble">{message.content}</div>
+      </div>
+    );
+  }
 
   return (
-    <div className={cn(
-      "group flex gap-4 p-6 hover:bg-gray-50/50 transition-colors",
-      message.role === 'assistant' && "bg-gray-50/30"
-    )}>
-      {/* Avatar */}
-      <div className="flex-shrink-0">
-        <Avatar className="h-8 w-8">
-          <AvatarFallback className={cn(
-            "text-sm font-medium",
-            message.role === 'user' 
-              ? "bg-blue-100 text-blue-700" 
-              : "bg-green-100 text-green-700"
-          )}>
-            {message.role === 'user' ? 'U' : 'AI'}
-          </AvatarFallback>
-        </Avatar>
-      </div>
-
-      {/* Message Content */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-sm font-medium text-gray-900">
-            {message.role === 'user' ? 'You' : 'SeaTac AI'}
-          </span>
-          <span className="text-xs text-gray-500">
-            {formatTime(message.timestamp)}
-          </span>
+    <article className="sea-msg sea-msg-assistant" id={`msg-${message.id}`} aria-label="Answer from SeaTac AI">
+        <div className="sea-msg-meta">
+          <span className="sea-msg-author">SeaTac AI</span>
+          <time dateTime={new Date(message.timestamp).toISOString()}>{formatTime(message.timestamp)}</time>
         </div>
-        
-        {message.role === 'assistant' && <SourceBadge source={message.metadata?.sqlSource} />}
+
+        <SourceBadge source={message.metadata?.sqlSource} />
 
         {/* Markdown content */}
         <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">
@@ -212,30 +194,11 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </div>
         )}
 
-        {/* Action Buttons */}
-        {message.role === 'assistant' && (
-          <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={copyToClipboard}
-              className="h-7 px-2 text-xs text-gray-500 hover:text-gray-700"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-3 w-3 mr-1" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="h-3 w-3 mr-1" />
-                  Copy
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-      </div>
-    </div>
+        <div className="sea-msg-actions">
+          <button type="button" className="sea-btn sea-btn-ghost sea-copy" onClick={copyToClipboard}>
+            {copied ? <><Check aria-hidden="true" /> Copied</> : <><Copy aria-hidden="true" /> Copy</>}
+          </button>
+        </div>
+    </article>
   );
 }
