@@ -347,6 +347,15 @@ def test_reference_prompt_has_no_comments_or_expected_values(vm):
         pytest.fail("comment markers left in the reference queries prompt")
     if re.search(r"\bGT\b|ground truth|expected", prompt, re.I):
         pytest.fail("expected-answer wording left in the reference queries prompt")
+    # Label lines ("Example: Q1, taxi-in by aircraft type") are allowed: the Q number and words, no other digit.
+    labels = [line for line in prompt.splitlines() if line.startswith("Example")]
+    bad = sum(1 for line in labels if not re.fullmatch(r"Example: Q(?:[1-9]|10)[a-c]?(?:, [^\d]+)?", line))
+    if bad:
+        pytest.fail(f"{bad} example label line(s) contain a number or an unexpected format")
+    if len(labels) != prompt.count(";"):
+        pytest.fail("every reference SELECT should have exactly one label line")
+    if {re.match(r"Example: Q(\d+)", line).group(1) for line in labels} != {str(q) for q in range(1, 11)}:
+        pytest.fail("labels should cover Q1-Q10")
     source = vm.QUESTION_QUERIES.read_text(encoding="utf-8")
     comments = " ".join(re.findall(r"--(.*)$", source, re.M) + re.findall(r"/\*(.*?)\*/", source, re.S))
     values = set(re.findall(r"\d[\d,]*\.\d+|\d{1,3}(?:,\d{3})+", comments))
@@ -360,7 +369,7 @@ def test_reference_prompt_has_no_comments_or_expected_values(vm):
 def test_every_reference_select_passes_the_runtime_guard(vm):
     uncommented = "\n".join(
         line for line in vm.REFERENCE_QUERIES.splitlines()
-        if not line.lstrip().startswith("--")
+        if not line.lstrip().startswith("--") and not line.startswith("Example: ")  # label lines are not SQL
     )
     statements = [statement.strip() for statement in uncommented.split(";") if statement.strip()]
     assert len(statements) == 18

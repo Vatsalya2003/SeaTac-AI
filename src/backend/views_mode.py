@@ -134,16 +134,53 @@ def strip_sql_comments(text):
     return "\n".join(lines)
 
 
+HEADING = re.compile(r"^--\s*(Q(\d+)([a-z]?))\s+(.*)$")
+
+
+def example_label(heading, parent=""):
+    """Short label from a section heading, e.g. "Q1, taxi-in by aircraft type". Keeps only the description:
+    cut at the first "GT:" / "Expected:" / sentence end, drop (...) asides and any word with a digit, so no
+    expected value from the comments can reach the prompt."""
+    text = re.split(r"\bGT:|\bExpected:|\.(?:\s|$)", heading, maxsplit=1)[0]
+    text = re.sub(r"\([^)]*\)?", "", text)
+    text = " ".join(w for w in text.split() if not re.search(r"\d", w))
+    text = re.sub(r"\s+,", ",", text).strip(" ,;:-")
+    if parent and text[:1].islower():  # "Q7a by taxiway section" -> "taxiway usage by taxiway section"
+        text = f"{parent} {text}" if text.startswith("by ") else f"{parent}, {text}"
+    if text[1:2].islower():
+        text = text[:1].lower() + text[1:]
+    return text
+
+
 def load_reference_queries():
     """Load the reviewed SQL examples without their comments: the comments hold the expected answers,
-    which must never reach the AI prompt. Fail at startup if the file is missing, empty or unsafe."""
-    text = strip_sql_comments(QUESTION_QUERIES.read_text(encoding="utf-8"))
-    if not text:
+    which must never reach the AI prompt. Each SELECT gets one label line built from its section heading
+    ("Example: Q1, taxi-in by aircraft type"). Fail at startup if the file is missing, empty or unsafe."""
+    raw = QUESTION_QUERIES.read_text(encoding="utf-8")
+    if not strip_sql_comments(raw):
         raise RuntimeError(f"Reference query file is empty: {QUESTION_QUERIES}")
+    examples, label, parents, sql = [], "", {}, []
+    for line in raw.splitlines():
+        m = HEADING.match(line.strip())
+        if m:
+            qid, number, part, rest = m.groups()
+            desc = example_label(rest, "" if not part else parents.get(number, ""))
+            if not part:
+                parents[number] = desc
+            label = f"Example: {qid}, {desc}" if desc else f"Example: {qid}"
+            continue
+        code = strip_sql_comments(line)
+        if code:
+            sql.append(code)
+            if code.rstrip().endswith(";"):
+                examples.append(f"{label}\n" + "\n".join(sql) if label else "\n".join(sql))
+                label, sql = "", []
+    if sql:
+        examples.append("\n".join(sql))
+    text = "\n\n".join(examples)
     if re.search(r"(?im)^\s*USE\s+", text):
         raise RuntimeError(f"Reference query file must not contain USE statements: {QUESTION_QUERIES}")
-    statements = [st.strip() for st in text.split(";") if st.strip()]
-    return "\n\n".join(f"{st};" for st in statements)
+    return text
 
 
 REFERENCE_QUERIES = load_reference_queries()
