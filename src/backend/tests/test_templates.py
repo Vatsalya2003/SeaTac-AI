@@ -322,3 +322,41 @@ def test_agent_invalid_intent_falls_back(app):
     agent.intent_client = FakeIntentClient('{"question": "Q99", "date": null}')
     r = asyncio.run(agent.process_query("something unusual"))
     assert r["sql_source"] == "ai_sql" and not r["success"]
+
+
+# ---- answer source label sent to the frontend badge (/api/query) ------------------------------------------------
+
+def _ask_endpoint(app, monkeypatch, agent, question):
+    monkeypatch.setattr(app, "agent_system", agent)
+    return asyncio.run(app.handle_query(app.QueryRequest(query=question)))
+
+
+def test_endpoint_labels_template_answers_verified(app, monkeypatch):
+    agent = app.SeaTacAgent(None, None, app.db_manager)
+    agent.intent_client = FakeIntentClient('{"question": "Q8", "date": null}')
+    r = _ask_endpoint(app, monkeypatch, agent, "What is the average time from wheels-down to parking?")
+    assert r.success and r.sql_source == "template"
+
+
+def test_endpoint_labels_ai_sql_answers_not_verified(app, monkeypatch):
+    sql = "SELECT carrier, COUNT(*) AS flights FROM v_taxi_in WHERE exclusion_reason IS NULL GROUP BY carrier ORDER BY carrier"
+    agent = app.SeaTacAgent(FakeGenerator(sql), None, app.db_manager)
+    agent.intent_client = FakeIntentClient('{"question": "other", "date": null}')
+    r = _ask_endpoint(app, monkeypatch, agent, "How many arrivals did each carrier have?")
+    assert r.success and r.sql_source == "ai_sql"
+
+
+def test_endpoint_gives_no_label_when_it_cannot_answer(app, monkeypatch):
+    agent = app.SeaTacAgent(FakeGenerator(None), None, app.db_manager)
+    agent.intent_client = FakeIntentClient('{"question": "other", "date": null}')
+    r = _ask_endpoint(app, monkeypatch, agent, "something unusual")
+    assert not r.success and r.sql_source == "none"
+
+
+def test_answer_source_for_every_mode(app):
+    src = app.answer_source
+    assert src({"success": True, "sql_source": "template"}) == "template"
+    for legacy_or_views in ("generated", "prebuilt", "claude", "ai_sql", None):  # legacy and views mode
+        assert src({"success": True, "sql_source": legacy_or_views}) == "ai_sql"
+    for failed in ("template", "ai_sql", "error", "rejected", "none"):
+        assert src({"success": False, "sql_source": failed}) == "none"

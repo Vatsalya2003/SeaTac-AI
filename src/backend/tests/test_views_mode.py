@@ -328,3 +328,73 @@ def test_prompt_columns_exist_in_views(vm, admin_fetch):
 
 def test_prompt_lists_every_view(vm):
     assert all(v in vm.VIEWS_SCHEMA for v in vm.VIEWS)
+
+
+def test_validated_reference_queries_are_loaded(vm):
+    assert vm.QUESTION_QUERIES.exists()
+    assert vm.REFERENCE_QUERIES in vm.SQL_REFERENCE_CONTEXT
+    assert vm.REFERENCE_QUERY_INSTRUCTIONS in vm.SQL_REFERENCE_CONTEXT
+    assert not re.search(r"(?im)^\s*USE\s+", vm.REFERENCE_QUERIES)
+    source = vm.QUESTION_QUERIES.read_text(encoding="utf-8")  # section headings are comments: in the file only
+    assert all(re.search(rf"(?m)^-- Q{q}(?:\D|$)", source) for q in range(1, 11))
+
+
+def test_reference_prompt_has_no_comments_or_expected_values(vm):
+    # The file's comments hold the Port's expected answers (GT: lines); none of them may reach the AI prompt.
+    # Failure messages give counts only, never the values.
+    prompt = vm.REFERENCE_QUERIES
+    if "--" in prompt or "/*" in prompt or "*/" in prompt:
+        pytest.fail("comment markers left in the reference queries prompt")
+    if re.search(r"\bGT\b|ground truth|expected", prompt, re.I):
+        pytest.fail("expected-answer wording left in the reference queries prompt")
+    # Label lines ("Example: Q1, taxi-in by aircraft type") are allowed: the Q number and words, no other digit.
+    labels = [line for line in prompt.splitlines() if line.startswith("Example")]
+    bad = sum(1 for line in labels if not re.fullmatch(r"Example: Q(?:[1-9]|10)[a-c]?(?:, [^\d]+)?", line))
+    if bad:
+        pytest.fail(f"{bad} example label line(s) contain a number or an unexpected format")
+    if len(labels) != prompt.count(";"):
+        pytest.fail("every reference SELECT should have exactly one label line")
+    if {re.match(r"Example: Q(\d+)", line).group(1) for line in labels} != {str(q) for q in range(1, 11)}:
+        pytest.fail("labels should cover Q1-Q10")
+    source = vm.QUESTION_QUERIES.read_text(encoding="utf-8")
+    comments = " ".join(re.findall(r"--(.*)$", source, re.M) + re.findall(r"/\*(.*?)\*/", source, re.S))
+    values = set(re.findall(r"\d[\d,]*\.\d+|\d{1,3}(?:,\d{3})+", comments))
+    if not values:
+        pytest.fail("no expected values found in the file's comments: this test would not catch a leak")
+    leaked = sum(1 for v in values if re.search(rf"(?<![\d.,]){re.escape(v)}(?![\d,]|\.\d)", vm.SQL_REFERENCE_CONTEXT))
+    if leaked:
+        pytest.fail(f"{leaked} expected value(s) from the comments appear in the SQL prompt")
+
+
+def test_every_reference_select_passes_the_runtime_guard(vm):
+    uncommented = "\n".join(
+        line for line in vm.REFERENCE_QUERIES.splitlines()
+        if not line.lstrip().startswith("--") and not line.startswith("Example: ")  # label lines are not SQL
+    )
+    statements = [statement.strip() for statement in uncommented.split(";") if statement.strip()]
+    assert len(statements) == 18
+    failures = [(index, vm.check_view_sql(statement)[1])
+                for index, statement in enumerate(statements, 1)
+                if not vm.check_view_sql(statement)[0]]
+    assert not failures
+
+
+# ---- answer source label sent to the frontend badge (/api/query) ------------------------------------------------
+
+def _ask_endpoint(app, monkeypatch, sql, question):
+    monkeypatch.setattr(app, "agent_system", app.SeaTacAgent(FakeGenerator(sql), None, app.db_manager))
+    return asyncio.run(app.handle_query(app.QueryRequest(query=question)))
+
+
+def test_endpoint_labels_views_answers_ai_generated(app, monkeypatch):
+    sql = "SELECT runway, COUNT(*) AS flights FROM v_runway_occupancy WHERE exclusion_reason IS NULL GROUP BY runway ORDER BY runway"
+    r = _ask_endpoint(app, monkeypatch, sql, "flights per runway")
+    assert r.success and r.sql_source == "ai_sql"
+
+
+def test_endpoint_gives_no_label_to_rejected_sql_or_greetings(app, monkeypatch):
+    r = _ask_endpoint(app, monkeypatch, "DELETE FROM v_taxi_in", "delete everything")
+    assert not r.success and r.sql_source == "none"
+    monkeypatch.setattr(app, "greeting_handler", app.GreetingHandler(None))  # no AI client: built-in reply
+    r = _ask_endpoint(app, monkeypatch, "SELECT 1", "hi")
+    assert r.sql_source == "system"

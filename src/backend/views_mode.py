@@ -2,6 +2,7 @@
 Views mode (QUERY_MODE=views): the chatbot queries the `seatac` metric views instead of the old tables.
 
 - VIEWS_SCHEMA: the prompt text that describes the views and the Port's confirmed rules
+- REFERENCE_QUERIES: validated Q1-Q10 examples loaded from src/database/sql/question_queries.sql
 - check_view_sql(): only a single SELECT on the seatac views may run
 - is_greeting_or_casual(): small-talk check that sends real questions ("Can you...", "Show...") to SQL
 - build_answer(): the answer text, written in code from the FULL result, with the metric definition
@@ -13,7 +14,9 @@ import re
 from pathlib import Path
 
 VIEWS_DATABASE = "seatac"
-METRIC_RULES = Path(__file__).resolve().parent.parent / "database" / "metric_rules.yaml"
+DATABASE_DIR = Path(__file__).resolve().parent.parent / "database"
+METRIC_RULES = DATABASE_DIR / "metric_rules.yaml"
+QUESTION_QUERIES = DATABASE_DIR / "sql" / "question_queries.sql"
 
 VIEWS = ["v_taxi_in", "v_taxi_out", "v_weight_classes", "v_movement_area", "v_movement_area_hourly_peak",
          "v_runway_occupancy", "v_takeoff_delay", "v_taxiway_usage", "v_runway_activity", "v_peak_hours"]
@@ -96,18 +99,92 @@ RULES
 - Missed approaches (Q9): count them separately with is_missed_approach = 1 (not completed landings).
 - Q10 peak hours: use v_peak_hours (it already counts take-offs + landings without needing a runway).
 - One SELECT statement only. No other tables, no comments, no semicolons.
-
-EXAMPLES
-Q8: SELECT ROUND(AVG(duration_sec) / 60, 2) AS avg_taxi_in_min, COUNT(*) AS flights
-    FROM v_taxi_in WHERE exclusion_reason IS NULL
-Q1: SELECT aircraft_type_group, ROUND(AVG(duration_sec) / 60, 2) AS avg_taxi_in_min, COUNT(*) AS flights
-    FROM v_taxi_in WHERE exclusion_reason IS NULL GROUP BY aircraft_type_group ORDER BY avg_taxi_in_min DESC
-Q6: SELECT w.label AS weight_class, ROUND(AVG(t.duration_sec) / 60, 2) AS avg_taxi_in_min, COUNT(t.flight_info_id) AS flights
-    FROM v_weight_classes w LEFT JOIN v_taxi_in t ON t.weight_class_group = w.weight_class_group AND t.exclusion_reason IS NULL
-    GROUP BY w.weight_class_group, w.label, w.sort_order ORDER BY w.sort_order
-Q9: SELECT runway, activity, COUNT(*) AS flights FROM v_runway_activity
-    WHERE exclusion_reason IS NULL GROUP BY runway, activity ORDER BY runway, activity
 """
+
+REFERENCE_QUERY_INSTRUCTIONS = """VALIDATED REFERENCE QUERIES
+The Q1-Q10 queries below were checked against our ground truth file.
+They are examples that guide SQL generation, not fixed queries to execute verbatim.
+- Choose only the example or calculation relevant to the user's question.
+- Return one SELECT statement, even when the reference file shows several variants for one question.
+- Adapt dates, filters, grouping and ordering to the user's wording.
+- If the user gives no date, use the dataset's default reporting day, 2025-08-08:
+  selection_date = '2025-08-08' on the per-flight views, and
+  local_date = '2025-08-08' on v_peak_hours and v_movement_area_hourly_peak.
+- Do not copy semicolons into the generated SQL.
+- Never output USE, query the underlying flights table or read anything except the allowed views.
+"""
+
+
+def strip_sql_comments(text):
+    """Remove /* */ blocks and -- comments (outside quoted strings), then drop blank lines."""
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    lines = []
+    for line in text.splitlines():
+        quote = None
+        for i, ch in enumerate(line):
+            if quote:
+                quote = None if ch == quote else quote
+            elif ch in "'\"":
+                quote = ch
+            elif line.startswith("--", i):
+                line = line[:i]
+                break
+        if line.strip():
+            lines.append(line.rstrip())
+    return "\n".join(lines)
+
+
+HEADING = re.compile(r"^--\s*(Q(\d+)([a-z]?))\s+(.*)$")
+
+
+def example_label(heading, parent=""):
+    """Short label from a section heading, e.g. "Q1, taxi-in by aircraft type". Keeps only the description:
+    cut at the first "GT:" / "Expected:" / sentence end, drop (...) asides and any word with a digit, so no
+    expected value from the comments can reach the prompt."""
+    text = re.split(r"\bGT:|\bExpected:|\.(?:\s|$)", heading, maxsplit=1)[0]
+    text = re.sub(r"\([^)]*\)?", "", text)
+    text = " ".join(w for w in text.split() if not re.search(r"\d", w))
+    text = re.sub(r"\s+,", ",", text).strip(" ,;:-")
+    if parent and text[:1].islower():  # "Q7a by taxiway section" -> "taxiway usage by taxiway section"
+        text = f"{parent} {text}" if text.startswith("by ") else f"{parent}, {text}"
+    if text[1:2].islower():
+        text = text[:1].lower() + text[1:]
+    return text
+
+
+def load_reference_queries():
+    """Load the reviewed SQL examples without their comments: the comments hold the expected answers,
+    which must never reach the AI prompt. Each SELECT gets one label line built from its section heading
+    ("Example: Q1, taxi-in by aircraft type"). Fail at startup if the file is missing, empty or unsafe."""
+    raw = QUESTION_QUERIES.read_text(encoding="utf-8")
+    if not strip_sql_comments(raw):
+        raise RuntimeError(f"Reference query file is empty: {QUESTION_QUERIES}")
+    examples, label, parents, sql = [], "", {}, []
+    for line in raw.splitlines():
+        m = HEADING.match(line.strip())
+        if m:
+            qid, number, part, rest = m.groups()
+            desc = example_label(rest, "" if not part else parents.get(number, ""))
+            if not part:
+                parents[number] = desc
+            label = f"Example: {qid}, {desc}" if desc else f"Example: {qid}"
+            continue
+        code = strip_sql_comments(line)
+        if code:
+            sql.append(code)
+            if code.rstrip().endswith(";"):
+                examples.append(f"{label}\n" + "\n".join(sql) if label else "\n".join(sql))
+                label, sql = "", []
+    if sql:
+        examples.append("\n".join(sql))
+    text = "\n\n".join(examples)
+    if re.search(r"(?im)^\s*USE\s+", text):
+        raise RuntimeError(f"Reference query file must not contain USE statements: {QUESTION_QUERIES}")
+    return text
+
+
+REFERENCE_QUERIES = load_reference_queries()
+SQL_REFERENCE_CONTEXT = f"{VIEWS_SCHEMA}\n\n{REFERENCE_QUERY_INSTRUCTIONS}\n\n{REFERENCE_QUERIES}"
 
 SQL_INSTRUCTIONS = """Write ONE MySQL SELECT statement on the views above that answers the question.
 Return ONLY the SQL: no explanation, no markdown, no comments, no semicolon.

@@ -279,7 +279,7 @@ def answer(qid, run, day=DEFAULT_DAY):
     # plus the one headline sentence the Stage 2 guide asks for.
     parts = [f"**Answer:** {built['headline'].strip()}"]
     for table in built.get("tables", []):
-        rows = table.count("\n") - 1
+        rows = sum(1 for line in table.splitlines() if line.startswith("|")) - 2  # minus header and --- line
         parts.append(f"**Answer** ({rows} rows):\n\n{table}")
     parts.append(f"**Sample:** based on {built['sample']}.")
     parts += [f"**Definition ({name}):** {d}" for name, d in definitions]

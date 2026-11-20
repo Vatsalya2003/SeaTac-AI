@@ -35,14 +35,13 @@ import os
 from dotenv import load_dotenv
 import uvicorn
 import requests
-from anthropic import Anthropic  # NEW: Claude SDK
 
 load_dotenv()
 
 # Initialize FastAPI app
 app = FastAPI(
     title="SeaTac Airport Operations Intelligence",
-    description="AI-powered airport operations analysis - Direct Claude v8.0 (Fast Mode)",
+    description="AI-powered airport operations analysis with Gemini and validated SeaTac views",
     version="8.0.0"
 )
 
@@ -299,7 +298,7 @@ class DirectClaudeSQLGenerator:
             print(f"🤖 Generating SQL query...")
             
             if VIEWS_MODE:
-                sql_prompt = f"""{views_mode.VIEWS_SCHEMA}
+                sql_prompt = f"""{views_mode.SQL_REFERENCE_CONTEXT}
 
 USER QUESTION: "{query}"
 
@@ -326,7 +325,7 @@ SQL Query:"""
             message = self.client.messages.create(
                 model=self.model,
                 max_tokens=1000,
-                temperature=0.1,
+                temperature=0 if VIEWS_MODE else 0.1,  # views/templates: deterministic SQL; legacy unchanged
                 messages=[{"role": "user", "content": sql_prompt}]
             )
             
@@ -1187,6 +1186,7 @@ if LLM_PROVIDER == 'gemini':
     claude_client = GeminiClient(GEMINI_API_KEY, GEMINI_MODEL) if GEMINI_API_KEY else None
     ACTIVE_MODEL = GEMINI_MODEL
 else:
+    from anthropic import Anthropic
     claude_client = Anthropic(api_key=CLAUDE_API_KEY) if CLAUDE_API_KEY else None
     ACTIVE_MODEL = CLAUDE_MODEL
 
@@ -1217,6 +1217,16 @@ class QueryResponse(BaseModel):
     included_count: Optional[int] = None
     excluded: Optional[Dict[str, Any]] = None
 
+def answer_source(result: Dict[str, Any]) -> str:
+    """sql_source sent to the frontend, which shows it as a badge above the answer:
+    'template' = a tested query answered (templates mode) -> "Verified answer";
+    'ai_sql'   = AI-written SQL (views mode, the templates fallback, legacy mode) -> "AI-generated, not yet verified";
+    'none'     = the question couldn't be answered -> no badge. Greetings use 'system' (no badge)."""
+    if not result.get('success'):
+        return 'none'
+    return 'template' if result.get('sql_source') == 'template' else 'ai_sql'
+
+
 class HealthResponse(BaseModel):
     status: str
     model: str
@@ -1242,9 +1252,27 @@ class DatabaseManager:
             'password': os.getenv('DB_PASSWORD', ''),
             'database': os.getenv('DB_NAME', 'AIplane')
         }
-        if VIEWS_MODE:  # read-only user with SELECT on the seatac views only; DB_NAME is not used
-            self.db_config.update(user='seatac_reader', password=os.getenv('SEATAC_READER_PASSWORD', ''),
-                                  database=views_mode.VIEWS_DATABASE)
+        if VIEWS_MODE:
+            # Views and templates modes log in only as the read-only user (SELECT on the seatac views).
+            # Never falls back to DB_USER / DB_PASSWORD; DB_NAME is not used.
+            self.db_config.update(
+                user=os.getenv('SEATAC_READER_USER') or 'seatac_reader',
+                password=os.getenv('SEATAC_READER_PASSWORD', ''),
+                database=views_mode.VIEWS_DATABASE,
+            )
+    
+    def check_reader_login(self) -> None:
+        """Views and templates modes: raise a clear error if the read-only login is missing or fails."""
+        user = self.db_config['user']
+        if not self.db_config['password']:
+            raise RuntimeError(f"QUERY_MODE={QUERY_MODE} needs SEATAC_READER_PASSWORD in src/backend/.env "
+                               f"(password of the read-only MySQL user {user}). See docs/SETUP_GUIDE.md.")
+        try:
+            mysql.connector.connect(**self.db_config).close()
+        except Error as e:
+            raise RuntimeError(f"QUERY_MODE={QUERY_MODE}: can't log in to MySQL as the read-only user {user} "
+                               f"(error {getattr(e, 'errno', '?')}). Check SEATAC_READER_PASSWORD in "
+                               f"src/backend/.env, or run src/database/scripts/create_reader.py.") from None
     
     def test_connection(self) -> bool:
         try:
@@ -2055,7 +2083,7 @@ async def handle_query(request: QueryRequest):
             chart=result.get('chart'),
             output_format=result.get('output_format'),
             output_confidence=result.get('output_confidence'),
-            sql_source=result.get('sql_source', 'generated'),  # Default to generic 'generated'
+            sql_source=answer_source(result),  # template / ai_sql / none: drives the answer badge
             metric=result.get('metric'),
             definition=result.get('definition'),
             included_count=result.get('included_count'),
@@ -2081,11 +2109,13 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
+    if VIEWS_MODE:
+        db_manager.check_reader_login()  # stops the server with a clear error; never falls back to DB_USER
     print("\n" + "=" * 80)
-    print("✈️  SeaTac Operations Intelligence - DIRECT CLAUDE v8.0 (FAST MODE)")
+    print("✈️  SeaTac Operations Intelligence - GEMINI + SEATAC VIEWS v8.0")
     print("=" * 80)
     
-    print(f"⚡ PRESENTATION SPEED MODE: Modal disabled, using Direct Claude")
+    print(f"⚡ PRESENTATION SPEED MODE: Modal disabled, using {LLM_PROVIDER.title()}")
     print(f"   Modal code preserved in comments (search for 'MODAL CODE')")
     print()
     
@@ -2109,16 +2139,16 @@ async def startup_event():
     else:
         print(f"   Status: Disconnected ❌")
     
-    print("\n⚡ OPTIMIZED SQL Pipeline (Direct Claude):")
-    print("   1️⃣  Claude generates SQL directly (SINGLE FAST API CALL)")
+    print(f"\n⚡ OPTIMIZED SQL Pipeline ({LLM_PROVIDER.title()}):")
+    print(f"   1️⃣  {LLM_PROVIDER.title()} generates SQL directly")
     print("   2️⃣  Auto-correct event types")
     print("   3️⃣  Execute SQL")
-    print("   4️⃣  Claude generates insights")
+    print("   4️⃣  Code builds the answer with definitions and sample sizes")
     
     print("\n✨ Speed Improvements v8.0:")
     print("   ✓ Eliminated Modal roundtrip (~2-3 sec saved)")
-    print("   ✓ Single Claude API call for SQL generation")
-    print("   ✓ Superior Claude SQL generation quality")
+    print(f"   ✓ Single {LLM_PROVIDER.title()} API call for SQL generation")
+    print("   ✓ SQL restricted to approved seatac views")
     print("   ✓ Auto-correction of event types")
     print("   ✓ Schema-aware generation")
     print("   ✓ Perfect for live presentations")

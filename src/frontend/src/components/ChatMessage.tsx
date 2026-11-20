@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { Copy, Check, BarChart3, Table as TableIcon } from 'lucide-react';
+import { Copy, Check, BarChart3, Table as TableIcon, BadgeCheck, Sparkles } from 'lucide-react';
 import { cn } from './ui/utils';
 import ChartVisualization from './ChartVisualization';
 import { DataTableWithExport } from './DataTableWithExport';
 
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import './query-results.css';
 
 interface Message {
   id: string;
@@ -16,15 +17,82 @@ interface Message {
   timestamp: Date | string;
   chart?: any;
   data?: any[];
+  metadata?: { sqlSource?: string };
 }
 
 interface ChatMessageProps {
   message: Message;
 }
 
+// Badge above each answer, from the backend's sql_source. Greetings ('system') and answers that
+// couldn't be given ('none', or no sql_source) get no badge.
+const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: typeof BadgeCheck }> = {
+  template: { label: 'Verified answer', Icon: BadgeCheck,
+              className: 'answer-badge--verified' },
+  ai_sql: { label: 'AI-generated, not yet verified', Icon: Sparkles,
+            className: 'answer-badge--ai' },
+};
+
+function SourceBadge({ source }: { source?: string }) {
+  const badge = source ? SOURCE_BADGES[source] : undefined;
+  if (!badge) return null;
+  const { label, className, Icon } = badge;
+  return (
+    <div className={cn('answer-badge', className)} data-testid="answer-source-badge">
+      <Icon className="answer-badge-icon" aria-hidden="true" />
+      {label}
+    </div>
+  );
+}
+
+// "**Answer** (N rows):" label lines (templates and views modes). The "**Answer:**" sentence is kept.
+const ROW_COUNT_LABEL = /^\*\*Answer\*\* \([\d,]+ rows?\)[^\n]*:[ \t]*\n?/gm;
+const isTableLine = (line: string) => line.trimStart().startsWith('|');
+
+// Removes the row-count labels. When the reply has data rows, also removes the last markdown table:
+// it holds the same rows as message.data, which is shown below as the sortable, exportable data table.
+// Every other table (e.g. Q4's arrivals/departures summary, Q7's by-taxiway table) stays in the text.
+function answerMarkdown(markdown: string, hasData: boolean): string {
+  const text = markdown.replace(ROW_COUNT_LABEL, '');
+  if (!hasData) return text;
+  const lines = text.split('\n');
+  let end = lines.length - 1;
+  while (end >= 0 && !isTableLine(lines[end])) end--;
+  if (end < 0) return text;
+  let start = end;
+  while (start > 0 && isTableLine(lines[start - 1])) start--;
+  lines.splice(start, end - start + 1);
+  return lines.join('\n');
+}
+
+const textOf = (node: any): string =>
+  typeof node === 'string' || typeof node === 'number' ? String(node)
+    : Array.isArray(node) ? node.map(textOf).join('')
+    : node?.props?.children !== undefined ? textOf(node.props.children) : '';
+
+// Markdown tables use the same style as the data table (query-results.css); numbers are right-aligned.
+const markdownTables = {
+  table: ({ node, ...props }: any) => (
+    <div className="query-md-table">
+      <table className="query-data-table" {...props} />
+    </div>
+  ),
+  td: ({ node, children, ...props }: any) => (
+    <td className={/^-?[\d,]+(\.\d+)?$/.test(textOf(children).trim()) ? 'query-number' : undefined} {...props}>
+      {children}
+    </td>
+  ),
+};
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>('table');
+  const hasData = message.role === 'assistant' && !!message.data?.length;
+  const detailStart = message.role === 'assistant'
+    ? message.content.search(/\*\*(?:Sample|Definition)[^\n]*?:\*\*/)
+    : -1;
+  const details = detailStart >= 0 ? message.content.slice(detailStart) : '';
+  const answer = detailStart >= 0 ? message.content.slice(0, detailStart) : message.content;
 
   const copyToClipboard = async () => {
     await navigator.clipboard.writeText(message.content);
@@ -73,10 +141,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
           </span>
         </div>
         
+        {message.role === 'assistant' && <SourceBadge source={message.metadata?.sqlSource} />}
+
         {/* Markdown content */}
-        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {message.content}
+        <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownTables}>
+            {message.role === 'assistant' ? answerMarkdown(answer, hasData) : answer}
           </ReactMarkdown>
         </div>
 
@@ -110,7 +180,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
               <DataTableWithExport 
                 data={message.data} 
                 title="SeaTac Operations Analysis"
-                pageSize={15}
+                pageSize={5}
               />
             )}
           </div>
@@ -129,8 +199,16 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <DataTableWithExport 
               data={message.data} 
               title="Query Results"
-              pageSize={15}
+              pageSize={5}
             />
+          </div>
+        )}
+
+        {details && (
+          <div className="query-calculation-details">
+            <div className="query-details-body">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{details}</ReactMarkdown>
+            </div>
           </div>
         )}
 
