@@ -60,8 +60,26 @@ const isTableLine = (line: string) => line.trimStart().startsWith('|');
 // Removes the row-count labels. When the reply has data rows, also removes the last markdown table:
 // it holds the same rows as message.data, which is shown below as the sortable, exportable data table.
 // Every other table (e.g. Q4's arrivals/departures summary, Q7's by-taxiway table) stays in the text.
+const NUMBER_CELL = /^-?[\d,]+(\.\d+)?$/;
+const cellsOf = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+
+// Marks number columns right-aligned in each markdown table (|---:|), labels left (|:---|).
+function alignTableColumns(text: string): string {
+  const lines = text.split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    if (!/^\s*\|(\s*:?-+:?\s*\|)+\s*$/.test(lines[i]) || !isTableLine(lines[i - 1])) continue;
+    let end = i + 1;
+    while (end < lines.length && isTableLine(lines[end])) end++;
+    const body = lines.slice(i + 1, end).map(cellsOf);
+    const numeric = cellsOf(lines[i]).map((_, c) => body.length > 0
+      && body.every(r => NUMBER_CELL.test(r[c] ?? '') || r[c] === 'No data') && body.some(r => NUMBER_CELL.test(r[c] ?? '')));
+    lines[i] = '|' + numeric.map(n => (n ? '---:' : ':---')).join('|') + '|';
+  }
+  return lines.join('\n');
+}
+
 function answerMarkdown(markdown: string, hasData: boolean): string {
-  const text = markdown.replace(ROW_COUNT_LABEL, '');
+  const text = alignTableColumns(markdown.replace(ROW_COUNT_LABEL, ''));
   if (!hasData) return text;
   const lines = text.split('\n');
   let end = lines.length - 1;

@@ -139,7 +139,8 @@ export function DataTableWithExport({
   };
 
   // Format cell value
-  const isNumeric = (col: string) => data.some(row => typeof row[col] === 'number');
+  // numbers are right-aligned; hours (00:00) are labels, left-aligned
+  const isNumeric = (col: string) => !isHourColumn(col) && data.some(row => typeof row[col] === 'number');
   const formatValue = (value: any, col: string): string => {
     if (value == null) return 'No data';
     if (isHourColumn(col)) return formatHour(value) ?? String(value);  // 0-23 -> "00:00" … "23:00"

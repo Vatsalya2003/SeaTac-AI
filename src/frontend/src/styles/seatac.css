@@ -444,3 +444,12 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-msg-assistant .query-data-table tbody tr.query-row-headline td:first-child { box-shadow: inset 3px 0 0 var(--sea-accent); }
 .sea-msg-assistant .query-data-table tbody tr.query-row-gap td { padding: 2px 10px; color: var(--sea-ink-muted); text-align: center; line-height: 1; }
 :root[data-theme="dark"] .sea-app .query-data-table tbody tr.query-row-headline { background: var(--sea-accent-tint); }
+
+/* narrower tables: as wide as their content (up to the card), labels left, numbers right */
+.sea-msg-assistant .rounded-lg.border.overflow-hidden,
+.sea-msg-assistant .query-md-table { width: fit-content; max-width: 100%; }
+.sea-msg-assistant .query-data-table { width: auto; }
+.sea-msg-assistant .query-data-table th { text-align: left; }
+.sea-msg-assistant .query-data-table th.query-number,
+.sea-msg-assistant .query-data-table td.query-number { text-align: right; }
+.sea-msg-assistant .query-data-table th, .sea-msg-assistant .query-data-table td { min-width: 64px; }
