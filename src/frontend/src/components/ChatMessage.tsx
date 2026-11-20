@@ -17,11 +17,25 @@ interface Message {
   timestamp: Date | string;
   chart?: any;
   data?: any[];
-  metadata?: { sqlSource?: string; queryType?: string };
+  metadata?: { sqlSource?: string; queryType?: string; metric?: string };
 }
 
 interface ChatMessageProps {
   message: Message;
+  /** the question this answer replies to (used for titles when nothing better is known) */
+  question?: string;
+}
+
+const GENERIC_TITLES = /^(seatac operations( analysis)?|query results)?$/i;
+
+// Title for the answer's table and chart, from the question: the chart's own title (tested answers),
+// else the question's name, else the question as asked. "(top 15)" is dropped for the table, which has every row.
+function resultTitle(chartTitle: string | undefined, metric: string | undefined, question: string | undefined) {
+  const fromChart = (chartTitle ?? '').trim();
+  if (!GENERIC_TITLES.test(fromChart)) return fromChart.replace(/\s*\(top \d+\)\s*$/i, '');
+  if (metric?.trim()) return metric.trim();
+  const q = (question ?? '').replace(/\s+/g, ' ').trim().replace(/\?$/, '');
+  return q ? (q.length > 80 ? `${q.slice(0, 79)}…` : q) : 'Results';
 }
 
 // Badge above each answer, from the backend's sql_source. Greetings ('system') and answers that
@@ -112,12 +126,15 @@ const markdownTables = {
   ),
 };
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, question }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   // hourly answers (Q2 taxi-out by hour, Q3 movement area by hour, Q10 peak hours) open on the chart
   const [viewMode, setViewMode] = useState<'chart' | 'table'>(
     () => (HOURLY_ANSWERS.has(message.metadata?.queryType ?? '') && message.chart ? 'chart' : 'table'));
   const hasData = message.role === 'assistant' && !!message.data?.length;
+  const tableTitle = resultTitle(message.chart?.title, message.metadata?.metric, question);
+  const chartConfig = message.chart && GENERIC_TITLES.test((message.chart.title ?? '').trim())
+    ? { ...message.chart, title: tableTitle } : message.chart;
   const detailStart = message.role === 'assistant'
     ? message.content.search(/\*\*(?:Sample|Definition)[^\n]*?:\*\*/)
     : -1;
@@ -188,12 +205,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
 
             {viewMode === 'chart' ? (
-              <ChartVisualization chartConfig={message.chart} insightsText={message.content} />
+              <ChartVisualization chartConfig={chartConfig} insightsText={message.content} />
             ) : (
               <DataTableWithExport 
                 data={message.data} 
                 highlightRow={headlineRow(message.metadata?.queryType, message.data)}
-                title="SeaTac Operations Analysis"
+                title={tableTitle}
                 pageSize={5}
               />
             )}
@@ -203,7 +220,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {/* Chart Only (no table data) */}
         {message.role === 'assistant' && message.chart && (!message.data || message.data.length === 0) && (
           <div className="mt-4">
-            <ChartVisualization chartConfig={message.chart} insightsText={message.content} />
+            <ChartVisualization chartConfig={chartConfig} insightsText={message.content} />
           </div>
         )}
 
@@ -213,7 +230,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             <DataTableWithExport 
               data={message.data} 
               highlightRow={headlineRow(message.metadata?.queryType, message.data)}
-              title="Query Results"
+              title={tableTitle}
               pageSize={5}
             />
           </div>

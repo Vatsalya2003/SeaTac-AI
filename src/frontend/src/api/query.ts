@@ -13,6 +13,7 @@ export interface QueryResponse {
   use_case?: string;
   insights?: string[];
   sql_queries?: string[];
+  metric?: string;  // templates mode: the question's name, e.g. "Runway occupancy time"
 }
 
 export async function queryAPI(query: string): Promise<QueryResponse> {
@@ -70,7 +71,8 @@ export async function queryAPI(query: string): Promise<QueryResponse> {
       sql_source: data.sql_source,
       use_case: data.use_case,
       insights: data.insights,
-      sql_queries: data.sql_queries
+      sql_queries: data.sql_queries,
+      metric: data.metric
     };
 
   } catch (error) {

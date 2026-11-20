@@ -361,7 +361,7 @@ def _q3(res, run, day):
              "that passed through during the hour.",
              "PENDING PORT CONFIRMATION: the hatched movement-area boundary is mapped to the export's Movement Area "
              "Entrance/Exit times (working assumption)."]
-    chart = _chart("bar", "Most aircraft in the movement area at the same time, by hour",
+    chart = _chart("bar", "Peak aircraft in the movement area, by hour",
                    [hour_label(r["local_hour"]) for r in rows], [("Aircraft at once", [r["max_aircraft_in_area"] for r in rows])],
                    "Aircraft")
     return {"headline": head, "tables": [_table(data, ["local_hour", "max_aircraft_in_area"], ["Hour", "Most aircraft at once"])],

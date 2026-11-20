@@ -21,6 +21,7 @@ interface Message {
     queryType?: string;
     rowCount?: number;
     sqlSource?: string;
+    metric?: string;
   };
 }
 
@@ -224,7 +225,8 @@ export default function App() {
           outputConfidence: response.output_confidence,
           queryType: response.use_case,
           rowCount: response.row_count || 0,
-          sqlSource: response.sql_source
+          sqlSource: response.sql_source,
+          metric: response.metric
         }
       };
 
@@ -362,8 +364,9 @@ export default function App() {
             <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
           ) : (
             <div className="sea-thread">
-              {messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
+              {messages.map((message, i) => (
+                <ChatMessage key={message.id} message={message}
+                             question={messages[i - 1]?.role === 'user' ? messages[i - 1].content : undefined} />
               ))}
               {isTyping && (
                 <div className="sea-loading" role="status">
