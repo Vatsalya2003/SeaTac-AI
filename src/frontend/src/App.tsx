@@ -228,7 +228,8 @@ export default function App() {
           sqlQueries: response.sql_queries,
           definition: response.definition,
           includedCount: response.included_count,
-          excluded: response.excluded
+          excluded: response.excluded,
+          ruleStatus: response.rule_status
         }
       };
 

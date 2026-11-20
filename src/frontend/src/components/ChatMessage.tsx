@@ -152,7 +152,7 @@ export function ChatMessage({ message, question, onShowDetails }: ChatMessagePro
           ) : null}
         </div>
 
-        <SourceBadge source={badgeSource(message.metadata?.sqlSource, message.content)} />
+        <SourceBadge source={badgeSource(message.metadata?.sqlSource, message.content, message.metadata?.ruleStatus)} />
 
         {/* Markdown content */}
         <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">

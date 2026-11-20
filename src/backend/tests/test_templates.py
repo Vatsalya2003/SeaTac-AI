@@ -337,7 +337,7 @@ def test_endpoint_labels_template_answers_verified(app, monkeypatch):
     agent = app.SeaTacAgent(None, None, app.db_manager)
     agent.intent_client = FakeIntentClient('{"question": "Q8", "date": null}')
     r = _ask_endpoint(app, monkeypatch, agent, "What is the average time from wheels-down to parking?")
-    assert r.success and r.sql_source == "template"
+    assert r.success and r.sql_source == "template" and r.rule_status == "confirmed"
 
 
 def test_endpoint_labels_ai_sql_answers_not_verified(app, monkeypatch):
@@ -364,8 +364,21 @@ def test_answer_source_for_every_mode(app):
         assert src({"success": False, "sql_source": failed}) == "none"
 
 
+def test_rule_status(ans, tpl):
+    # Q2's Aerobahn off-block time was confirmed by the Port on Oct 19; only Q3, Q7 and Q10 are provisional
+    provisional = {"Q3", "Q7", "Q10"}
+    for i in range(1, 11):
+        q = f"Q{i}"
+        expected = "provisional" if q in provisional else "confirmed"
+        assert tpl.QUESTIONS[q]["rule_status"] == expected, f"{q} rule_status in QUESTIONS"
+        assert ans(q)["rule_status"] == expected, f"{q} rule_status in the answer"
+    q2 = ans("Q2")["answer"]
+    assert "Provisional" not in q2 and "pending" not in q2.lower() and "awaiting Port" not in q2, "Q2 has no provisional note"
+    assert "pending" not in ans("Q6")["answer"].lower(), "Q6 has no pending note about Q2's off-block source"
+
+
 def test_provisional_notes_wording(ans):
-    for q in ("Q2", "Q3", "Q7"):
+    for q in ("Q3", "Q7", "Q10"):
         text = ans(q)["answer"]
         assert "_Note: Provisional: " in text and "awaiting Port confirmation." in text, f"{q} provisional note"
         assert "PENDING PORT CONFIRMATION" not in text and "PROVISIONAL" not in text, f"{q} old wording"

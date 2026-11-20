@@ -17,6 +17,7 @@ export interface QueryResponse {
   definition?: string;
   included_count?: number;
   excluded?: Record<string, unknown>;
+  rule_status?: string;  // templates mode: 'confirmed' or 'provisional'
 }
 
 export async function queryAPI(query: string): Promise<QueryResponse> {
@@ -78,7 +79,8 @@ export async function queryAPI(query: string): Promise<QueryResponse> {
       metric: data.metric,
       definition: data.definition,
       included_count: data.included_count,
-      excluded: data.excluded
+      excluded: data.excluded,
+      rule_status: data.rule_status
     };
 
   } catch (error) {

@@ -16,6 +16,7 @@ export interface AnswerMetadata {
   definition?: string;
   includedCount?: number;
   excluded?: Record<string, unknown>;
+  ruleStatus?: string;  // 'confirmed' or 'provisional' (tested answers)
 }
 
 interface AnswerDetailsProps {
@@ -98,7 +99,7 @@ export function AnswerDetails({ content, metadata, onClose }: AnswerDetailsProps
         </header>
 
         <div className="sea-details-body">
-          <SourceBadge source={badgeSource(metadata?.sqlSource, content)} />
+          <SourceBadge source={badgeSource(metadata?.sqlSource, content, metadata?.ruleStatus)} />
 
           {definitions.length > 0 && (
             <section>

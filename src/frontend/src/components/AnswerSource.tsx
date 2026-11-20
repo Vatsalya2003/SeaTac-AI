@@ -12,12 +12,14 @@ const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: ty
             className: 'answer-badge--ai' },
 };
 
-// A tested answer whose rule the Port hasn't confirmed yet: a note reads "Provisional: …; awaiting Port
-// confirmation." (Q2, Q3, Q7; older saved chats say PROVISIONAL or PENDING PORT CONFIRMATION).
-// The backend sends no separate flag, so the text decides.
+// A tested answer whose rule the Port hasn't confirmed yet (Q3, Q7, Q10): the backend's rule_status says
+// "provisional". Chats saved before rule_status existed fall back to the note text.
 const PROVISIONAL_NOTE = /\bProvisional:|\bPROVISIONAL\b|PENDING PORT CONFIRMATION/;
-export const badgeSource = (source: string | undefined, content: string) =>
-  source === 'template' && PROVISIONAL_NOTE.test(content) ? 'provisional' : source;
+export const badgeSource = (source: string | undefined, content: string, ruleStatus?: string) => {
+  if (source !== 'template') return source;
+  if (ruleStatus) return ruleStatus === 'provisional' ? 'provisional' : 'template';
+  return PROVISIONAL_NOTE.test(content) ? 'provisional' : 'template';
+};
 
 export function SourceBadge({ source }: { source?: string }) {
   const badge = source ? SOURCE_BADGES[source] : undefined;
