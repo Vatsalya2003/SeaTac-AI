@@ -60,6 +60,8 @@ const isTableLine = (line: string) => line.trimStart().startsWith('|');
 // Removes the row-count labels. When the reply has data rows, also removes the last markdown table:
 // it holds the same rows as message.data, which is shown below as the sortable, exportable data table.
 // Every other table (e.g. Q4's arrivals/departures summary, Q7's by-taxiway table) stays in the text.
+const HOURLY_ANSWERS = new Set(['Q2', 'Q3', 'Q10']);
+
 const NUMBER_CELL = /^-?[\d,]+(\.\d+)?$/;
 const cellsOf = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
 
@@ -112,7 +114,9 @@ const markdownTables = {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('table');
+  // hourly answers (Q2 taxi-out by hour, Q3 movement area by hour, Q10 peak hours) open on the chart
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>(
+    () => (HOURLY_ANSWERS.has(message.metadata?.queryType ?? '') && message.chart ? 'chart' : 'table'));
   const hasData = message.role === 'assistant' && !!message.data?.length;
   const detailStart = message.role === 'assistant'
     ? message.content.search(/\*\*(?:Sample|Definition)[^\n]*?:\*\*/)
