@@ -1,133 +1,76 @@
-import { useState, useRef, useEffect } from 'react';
-import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
-import { Send, Square } from 'lucide-react';
-import { cn } from './ui/utils';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { ArrowUp, Loader2 } from 'lucide-react';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
+  /** true while an answer is coming: the box and the send button are disabled */
   disabled?: boolean;
-  isTyping?: boolean;
 }
 
-export function ChatInput({ onSendMessage, disabled = false, isTyping = false }: ChatInputProps) {
+const MAX_LINES = 6;
+
+export function ChatInput({ onSendMessage, disabled = false }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const canSend = message.trim().length > 0 && !disabled;
 
-  // Auto-resize textarea
-  useEffect(() => {
-    const textarea = textareaRef.current;
-    if (textarea) {
-      textarea.style.height = 'auto';
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
-    }
+  // grow with the text, up to 6 lines, then scroll
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    const style = getComputedStyle(el);
+    const line = parseFloat(style.lineHeight) || 24;
+    const max = line * MAX_LINES + parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, max)}px`;
+    el.style.overflowY = el.scrollHeight > max ? 'auto' : 'hidden';
   }, [message]);
 
-  // Focus on mount
+  // focus on load and when an answer has arrived (not on small screens, where it would open the keyboard)
   useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, []);
+    if (!disabled && window.matchMedia('(min-width: 768px)').matches) textareaRef.current?.focus();
+  }, [disabled]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const send = () => {
+    if (!canSend) return;
+    onSendMessage(message.trim());
+    setMessage('');
+  };
+
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
-    if (message.trim() && !disabled && !isTyping) {
-      onSendMessage(message.trim());
-      setMessage('');
-      // Reset textarea height
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto';
-      }
-    }
+    send();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    // Submit on Enter (without Shift)
-    if (e.key === 'Enter' && !e.shiftKey) {
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Enter sends, Shift+Enter adds a line (and Enter while composing text, e.g. an IME, does nothing)
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      handleSubmit(e);
+      send();
     }
-  };
-
-  const handleStop = () => {
-    // Placeholder for stop generation functionality
-    console.log('Stop generation requested');
   };
 
   return (
-    <div className="border-t border-gray-200 bg-white p-4">
-      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-        <div className="relative flex items-end gap-2">
-          {/* Textarea */}
-          <div className="flex-1 relative">
-            <Textarea
-              ref={textareaRef}
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder={
-                isTyping 
-                  ? "Waiting for response..." 
-                  : "Ask about flight operations, taxi times, delays..."
-              }
-              disabled={disabled || isTyping}
-              className={cn(
-                "min-h-[60px] max-h-[200px] resize-none pr-12",
-                "focus:ring-2 focus:ring-green-500 focus:border-transparent",
-                (disabled || isTyping) && "bg-gray-50 cursor-not-allowed"
-              )}
-              rows={1}
-            />
-            
-            {/* Character count (optional) */}
-            {message.length > 0 && (
-              <div className="absolute bottom-2 right-2 text-xs text-gray-400">
-                {message.length}
-              </div>
-            )}
-          </div>
-
-          {/* Submit/Stop Button */}
-          {isTyping ? (
-            <Button
-              type="button"
-              onClick={handleStop}
-              size="lg"
-              variant="outline"
-              className="h-[60px] px-4 border-red-300 hover:bg-red-50"
-            >
-              <Square className="h-5 w-5 text-red-600" />
-            </Button>
-          ) : (
-            <Button
-              type="submit"
-              disabled={!message.trim() || disabled}
-              size="lg"
-              className={cn(
-                "h-[60px] px-6",
-                "bg-green-600 hover:bg-green-700",
-                "disabled:bg-gray-300 disabled:cursor-not-allowed"
-              )}
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          )}
-        </div>
-
-        {/* Helper text */}
-        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-          <span>
-            Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border">Enter</kbd> to send,{' '}
-            <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border">Shift+Enter</kbd> for new line
-          </span>
-          {isTyping && (
-            <span className="text-green-600 font-medium">
-              AI is thinking...
-            </span>
-          )}
-        </div>
+    <div className="sea-composer">
+      <form className="sea-composer-box" onSubmit={handleSubmit} aria-busy={disabled}>
+        <label htmlFor="chat-input" className="sea-sr-only">Ask a question about SeaTac airfield operations</label>
+        <textarea
+          ref={textareaRef}
+          id="chat-input"
+          rows={1}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={disabled ? 'Waiting for the answer…' : 'Ask about taxi times, runway use, delays…'}
+          disabled={disabled}
+          aria-describedby="chat-input-hint"
+        />
+        <button type="submit" className="sea-send" disabled={!canSend}
+                aria-label={disabled ? 'Waiting for the answer' : 'Send question'}>
+          {disabled ? <Loader2 className="sea-spin" aria-hidden="true" /> : <ArrowUp aria-hidden="true" />}
+        </button>
       </form>
+      <p id="chat-input-hint" className="sea-composer-hint">Enter to send · Shift+Enter for a new line</p>
     </div>
   );
 }

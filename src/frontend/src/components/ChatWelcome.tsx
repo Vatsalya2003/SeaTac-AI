@@ -1,33 +1,38 @@
-import { ImageWithFallback } from "./figma/ImageWithFallback";
+import { ArrowUpRight } from 'lucide-react';
 
-export function ChatWelcome() {
-  const sampleQuestions = [
-    "How do I troubleshoot gate access issues?",
-    "What are the security protocols for visitor access?",
-    "How can I generate weekly access reports?",
-    "What should I do if the gate won't respond?",
-  ];
+// The Port's priority questions. Each one routes to a tested answer (checked against intent.py's keywords).
+export const SUGGESTED_QUESTIONS = [
+  'Average taxi-in time by aircraft type',
+  'Taxi-out time by hour of day',
+  'Busiest hours of the day',
+  'Runway occupancy for arrivals and departures',
+  'Average takeoff delay',
+  'Time from wheels-down to parking',
+  'Taxi times by weight class',
+  'Most used taxiways',
+  'Takeoffs and landings by runway',
+];
 
+interface ChatWelcomeProps {
+  onAsk: (question: string) => void;
+  disabled?: boolean;
+}
+
+export function ChatWelcome({ onAsk, disabled = false }: ChatWelcomeProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-3xl mx-auto">
-      {/* Logo */}
-      <div className="mb-8">
-        <ImageWithFallback
-          src="/aiportlogo.png"
-          alt="Gate Assistant Logo"
-          className="w-[40px] h-auto sm:w-[60px] md:w-[80px] lg:w-[100px] object-contain"
-        />
-      </div>
-
-      {/* Welcome Message */}
-      <div className="text-center mb-12">
-        <h1 className="text-2xl font-medium text-gray-900 mb-3">
-          Hello! How can I assist with your gate queries today?
-        </h1>
-        <p className="text-gray-600 text-sm max-w-2xl">
-          {"I'm here to help with gate assignments, flight gate changes, and\u00A0more."}
-        </p>
-      </div>
-    </div>
+    <section className="sea-welcome" aria-labelledby="welcome-title">
+      <h2 id="welcome-title">Ask about SeaTac airfield operations</h2>
+      <p>Taxi times, runway use, delays and peak hours, from the Port’s {'August\u00a08,\u00a02025'} data.</p>
+      <ul className="sea-chips" aria-label="Suggested questions">
+        {SUGGESTED_QUESTIONS.map((q) => (
+          <li key={q}>
+            <button type="button" className="sea-chip" onClick={() => onAsk(q)} disabled={disabled}>
+              <span>{q}</span>
+              <ArrowUpRight aria-hidden="true" />
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }

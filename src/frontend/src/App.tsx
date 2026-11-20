@@ -1,14 +1,12 @@
 import { queryAPI } from "./api/query";
 import { useState, useEffect, useRef } from 'react';
-import { ChatSidebar } from './components/ChatSidebar';
+import { ChatSidebar, SIDEBAR_DEFAULT, clampSidebarWidth, isMobileLayout } from './components/ChatSidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
-import { ScrollArea } from './components/ui/scroll-area';
-import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
-import { Plane, LogOut } from 'lucide-react';
+import { LoginPage } from './components/LoginPage';
+import { ThemeToggle, useTheme } from './theme';
+import { LogOut, PanelLeftOpen } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -34,22 +32,46 @@ interface ChatThread {
 }
 
 const STORAGE_KEY = 'aiport_chat_threads_v7_0_fixed';
+const SIDEBAR_WIDTH_KEY = 'seatac_sidebar_width';
+const SIDEBAR_COLLAPSED_KEY = 'seatac_sidebar_collapsed';
+
+// localStorage can be unavailable (private mode, blocked storage): the app still works without it
+const readSetting = (key: string): string | null => {
+  try { return localStorage.getItem(key); } catch { return null; }
+};
+const writeSetting = (key: string, value: string) => {
+  try { localStorage.setItem(key, value); } catch { /* not saved */ }
+};
+
+// Sidebar title: the chat's first question as plain text (no markdown), or "New chat"
+const chatTitle = (thread: ChatThread): string => {
+  const first = thread.messages.find(m => m.role === 'user')?.content ?? '';
+  const text = (first || (thread.title === 'New Chat' ? '' : thread.title))
+    .replace(/[*_`#>|~]/g, '').replace(/\s+/g, ' ').trim();
+  return text ? (text.length > 80 ? `${text.slice(0, 79)}…` : text) : 'New chat';
+};
 
 export default function App() {
   // Login state
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
   const [currentUser, setCurrentUser] = useState('');
 
+  const { theme, toggleTheme } = useTheme();
+
   // Chat state
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => readSetting(SIDEBAR_COLLAPSED_KEY) === '1');
+  const [sidebarWidth, setSidebarWidth] = useState(() =>
+    clampSidebarWidth(Number(readSetting(SIDEBAR_WIDTH_KEY) ?? SIDEBAR_DEFAULT)));
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Remember the sidebar width and collapsed state
+  useEffect(() => { writeSetting(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);
+  useEffect(() => { writeSetting(SIDEBAR_COLLAPSED_KEY, isSidebarCollapsed ? '1' : '0'); }, [isSidebarCollapsed]);
 
   // Check if already logged in
   useEffect(() => {
@@ -97,93 +119,41 @@ export default function App() {
     }
   }, [threads, isLoggedIn]);
 
-  // Auto-scroll
+  // Scrolling: a new question or the loading indicator scrolls to the bottom; a new answer scrolls to the
+  // top of that answer, so the one-sentence answer and its badge are in view (long tables follow below).
+  const activeMessages = threads.find(t => t.id === activeChat)?.messages ?? [];
+  const lastMessage = activeMessages[activeMessages.length - 1];
   useEffect(() => {
-    if (bottomRef.current) {
-      bottomRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!lastMessage) return;
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (lastMessage.role === 'assistant') {
+      document.getElementById(`msg-${lastMessage.id}`)?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    } else {
+      bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'end' });
     }
-  }, [threads]);
+  }, [lastMessage?.id, isTyping]);
 
-  // Login handler
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError('');
-
+  // Login check (demo accounts, no real auth). Returns true when the login worked.
+  const handleLogin = (username: string, password: string): boolean => {
     if ((username === 'admin' && password === 'admin123') || 
         (username === 'guest' && password === 'guest123')) {
       setCurrentUser(username);
       setIsLoggedIn(true);
       localStorage.setItem('aiport_user', username);
-    } else {
-      setLoginError('Invalid credentials');
+      return true;
     }
+    return false;
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentUser('');
     localStorage.removeItem('aiport_user');
-    setUsername('');
-    setPassword('');
   };
 
   // Show login page
   if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-green-50 p-4">
-        <Card className="w-full max-w-md shadow-lg">
-          <CardHeader className="space-y-3 text-center pb-6">
-            <div className="mx-auto bg-gradient-to-br from-blue-500 to-green-500 p-3 rounded-2xl w-fit">
-              <Plane className="h-8 w-8 text-white" />
-            </div>
-            <CardTitle className="text-2xl font-bold">AIport</CardTitle>
-            <CardDescription className="text-base">
-              AI-Powered Airport Operations Intelligence
-            </CardDescription>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                  {loginError}
-                </div>
-              )}
-              
-              <div className="space-y-2">
-                <label htmlFor="username" className="text-sm font-medium block">Username</label>
-                <Input
-                  id="username"
-                  type="text"
-                  placeholder="Enter your username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <label htmlFor="password" className="text-sm font-medium block">Password</label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  className="h-11"
-                />
-              </div>
-              
-              <Button type="submit" className="w-full h-11 text-base font-medium">
-                Sign In
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <LoginPage onLogin={handleLogin} themeToggle={<ThemeToggle theme={theme} onToggle={toggleTheme} />} />;
   }
 
   // Get current messages
@@ -301,112 +271,112 @@ export default function App() {
     }
   };
 
+  const createThread = (): ChatThread => ({
+    id: Date.now().toString(),
+    title: 'New Chat',
+    messages: [],
+    lastUpdated: new Date().toString()
+  });
+
   const handleNewChat = () => {
-    const newThread: ChatThread = {
-      id: Date.now().toString(),
-      title: 'New Chat',
-      messages: [],
-      lastUpdated: new Date().toString()
-    };
-    
+    if (currentThread && currentThread.messages.length === 0) return;  // already on an empty chat
+    const newThread = createThread();
     setThreads(prev => [newThread, ...prev]);
     setActiveChat(newThread.id);
-    console.log('🆕 New chat:', newThread.id);
   };
 
   const handleSelectChat = (chatId: string) => {
     setActiveChat(chatId);
-    console.log('📌 Selected:', chatId);
   };
 
   const handleDeleteChat = (chatId: string) => {
-    setThreads(prev => {
-      const remaining = prev.filter(t => t.id !== chatId);
-      if (activeChat === chatId) {
-        setActiveChat(remaining.length > 0 ? remaining[0].id : null);
-      }
-      return remaining;
-    });
+    const remaining = threads.filter(t => t.id !== chatId);
+    if (remaining.length === 0) {  // always keep one chat
+      const newThread = createThread();
+      setThreads([newThread]);
+      setActiveChat(newThread.id);
+      return;
+    }
+    setThreads(remaining);
+    if (activeChat === chatId) setActiveChat(remaining[0].id);
   };
+
+  // the clicked button disappears when the sidebar hides or shows, so focus moves to the matching one
+  const focusSoon = (selector: string) =>
+    requestAnimationFrame(() => document.querySelector<HTMLElement>(selector)?.focus());
+  const openSidebar = () => {
+    if (isMobileLayout()) return setMobileSidebarOpen(true);
+    setIsSidebarCollapsed(false);
+    focusSoon('[data-testid="sidebar-collapse"]');
+  };
+  const collapseSidebar = () => {
+    setIsSidebarCollapsed(true);
+    focusSoon('[data-testid="sidebar-open"]');
+  };
+  const sidebarVisible = mobileSidebarOpen || !isSidebarCollapsed;
 
   const isWelcomeView = messages.length === 0;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-white">
+    <div className="sea-app">
       <ChatSidebar
-        isCollapsed={isSidebarCollapsed}
-        onToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-        onNewChat={handleNewChat}
+        chats={threads.map(t => ({ id: t.id, title: chatTitle(t) }))}
         activeChat={activeChat}
         onSelectChat={handleSelectChat}
-        chatHistory={threads.map(t => ({
-          id: t.id,
-          title: t.title,
-          timestamp: t.lastUpdated,
-          preview: t.messages.length && t.messages[t.messages.length - 1]?.content
-            ? t.messages[t.messages.length - 1].content.slice(0, 80) 
-            : 'No messages yet'
-        }))}
+        onNewChat={handleNewChat}
         onDeleteChat={handleDeleteChat}
+        width={sidebarWidth}
+        onWidthChange={setSidebarWidth}
+        collapsed={isSidebarCollapsed}
+        onCollapse={collapseSidebar}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      <div className="flex-1 flex flex-col min-w-0 min-h-0">
-        {/* Header with user info and logout */}
-        <div className="border-b border-gray-200 bg-white px-6 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">AIport Assistant</h1>
-            <p className="text-xs text-gray-500">Logged in as {currentUser}</p>
+      <div className="sea-main">
+        <header className="sea-topbar">
+          <button
+            type="button"
+            className={`sea-icon-btn sea-menu-btn${isSidebarCollapsed ? '' : ' sea-mobile-only'}`}
+            onClick={openSidebar}
+            aria-label="Show sidebar"
+            aria-controls="chat-sidebar"
+            aria-expanded={sidebarVisible}
+            title="Show sidebar"
+            data-testid="sidebar-open"
+          >
+            <PanelLeftOpen aria-hidden="true" />
+          </button>
+          <h1 className="sea-topbar-title">SeaTac AI</h1>
+          <div className="sea-topbar-user">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <span className="sea-topbar-name">Signed in as {currentUser}</span>
+            <button type="button" className="sea-btn sea-btn-ghost sea-logout" onClick={handleLogout}>
+              <LogOut aria-hidden="true" /> Log out
+            </button>
           </div>
-          <Button variant="outline" size="sm" onClick={handleLogout} className="h-8 px-3">
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
+        </header>
+
+        <div className="sea-scroll" ref={scrollRef}>
+          {isWelcomeView ? (
+            <ChatWelcome onAsk={handleSendMessage} disabled={isTyping} />
+          ) : (
+            <div className="sea-thread">
+              {messages.map((message) => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              {isTyping && (
+                <div className="sea-loading" role="status">
+                  <span className="sea-dots" aria-hidden="true"><i /><i /><i /></span>
+                  Looking up the data…
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+          )}
         </div>
 
-        {isWelcomeView ? (
-          <ChatWelcome />
-        ) : (
-          <>
-            <div className="flex-1 overflow-hidden">
-              <ScrollArea ref={scrollAreaRef} className="h-full">
-                <div className="max-w-4xl mx-auto">
-                  {messages.map((message) => (
-                    <ChatMessage key={message.id} message={message} />
-                  ))}
-                  
-                  <div ref={bottomRef} />
-                  
-                  {isTyping && (
-                    <div className="flex gap-4 p-6 bg-gray-50/30">
-                      <div className="flex-shrink-0">
-                        <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                          <span className="text-sm font-medium text-green-700">AI</span>
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-900">Gate Assistant</span>
-                          <span className="text-xs text-gray-500">typing...</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-          </>
-        )}
-
-        <ChatInput
-          onSendMessage={handleSendMessage}
-          disabled={isTyping}
-          isTyping={isTyping}
-        />
+        <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
       </div>
     </div>
   );
