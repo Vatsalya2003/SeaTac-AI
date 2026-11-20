@@ -18,6 +18,7 @@ import {
   Download
 } from 'lucide-react';
 import { cn } from './ui/utils';
+import { formatHour, isHourColumn } from '../format';
 
 interface DataTableProps {
   data: any[];
@@ -114,7 +115,7 @@ export function DataTableWithExport({
     const headers = columns.join(',');
     const rows = sortedData.map(row =>
       columns.map(col => {
-        const value = row[col];
+        const value = isHourColumn(col) ? formatHour(row[col]) ?? row[col] : row[col];
         // Escape commas and quotes
         const escaped = String(value ?? '').replace(/"/g, '""');
         return `"${escaped}"`;
@@ -135,6 +136,7 @@ export function DataTableWithExport({
   const isNumeric = (col: string) => data.some(row => typeof row[col] === 'number');
   const formatValue = (value: any, col: string): string => {
     if (value == null) return 'No data';
+    if (isHourColumn(col)) return formatHour(value) ?? String(value);  // 0-23 -> "00:00" … "23:00"
     if (typeof value === 'number') {
       const average = /^avg_|^average_/.test(col);
       return value.toLocaleString('en-US', {
