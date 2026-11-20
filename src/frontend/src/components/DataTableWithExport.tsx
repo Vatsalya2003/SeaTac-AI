@@ -34,6 +34,9 @@ interface DataTableProps {
 
 type SortDirection = 'asc' | 'desc' | null;
 
+// Search and the "Showing X of Y rows" line only for longer tables
+const LONG_TABLE_ROWS = 25;
+
 export function DataTableWithExport({ 
   data, 
   columns: providedColumns,
@@ -182,9 +185,11 @@ export function DataTableWithExport({
           {title && (
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           )}
-          <p className="text-sm text-gray-500 mt-1">
-            Showing {sortedData.length ? startIndex + 1 : 0}–{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
-          </p>
+          {data.length >= LONG_TABLE_ROWS && (
+            <p className="text-sm text-gray-500 mt-1">
+              Showing {sortedData.length ? startIndex + 1 : 0}–{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
+            </p>
+          )}
         </div>
         
         {exportable && data.length > 0 && (
@@ -201,7 +206,7 @@ export function DataTableWithExport({
       </div>
 
       {/* Search Bar */}
-      {searchable && data.length > 10 && (
+      {searchable && data.length >= LONG_TABLE_ROWS && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
