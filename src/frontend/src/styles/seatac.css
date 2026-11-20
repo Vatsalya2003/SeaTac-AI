@@ -436,3 +436,11 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 /* data-table search box: centre its magnifier icon (its Tailwind classes aren't in the pre-built CSS) */
 .sea-msg-assistant .relative > svg.absolute.left-3 { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
 .sea-msg-assistant .relative > svg.absolute.left-3 ~ input { padding-left: 36px; }
+
+/* the data-table row the answer's headline is about */
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline,
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline:nth-child(even) { background: var(--sea-accent-tint); }
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline td { font-weight: 600; }
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline td:first-child { box-shadow: inset 3px 0 0 var(--sea-accent); }
+.sea-msg-assistant .query-data-table tbody tr.query-row-gap td { padding: 2px 10px; color: var(--sea-ink-muted); text-align: center; line-height: 1; }
+:root[data-theme="dark"] .sea-app .query-data-table tbody tr.query-row-headline { background: var(--sea-accent-tint); }

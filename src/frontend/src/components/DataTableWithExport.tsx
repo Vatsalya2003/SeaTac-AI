@@ -28,6 +28,8 @@ interface DataTableProps {
   searchable?: boolean;
   sortable?: boolean;
   exportable?: boolean;
+  /** the row the answer's headline is about (same object as in data), highlighted; none if undefined */
+  highlightRow?: any;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
@@ -39,7 +41,8 @@ export function DataTableWithExport({
   pageSize = 5,
   searchable = true,
   sortable = true,
-  exportable = true
+  exportable = true,
+  highlightRow
 }: DataTableProps) {
   // Extract columns from data if not provided
   const columns = providedColumns || (data.length > 0 ? Object.keys(data[0]) : []);
@@ -91,6 +94,9 @@ export function DataTableWithExport({
   const startIndex = 0;
   const endIndex = expanded ? sortedData.length : pageSize;
   const paginatedData = sortedData.slice(0, endIndex);
+  // keep the highlighted row visible in the short preview: shown after a "⋯" row if it would be hidden
+  const pinnedRow = !expanded && highlightRow !== undefined && sortedData.includes(highlightRow)
+    && !paginatedData.includes(highlightRow) ? highlightRow : undefined;
 
   // Handle sort
   const handleSort = (column: string) => {
@@ -255,8 +261,14 @@ export function DataTableWithExport({
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedData.map((row, rowIndex) => (
-                <TableRow key={rowIndex} className="hover:bg-gray-50">
+              [...paginatedData, ...(pinnedRow ? [null, pinnedRow] : [])].map((row, rowIndex) => row === null ? (
+                <TableRow key="gap" className="query-row-gap" aria-hidden="true">
+                  <TableCell colSpan={columns.length}>⋯</TableCell>
+                </TableRow>
+              ) : (
+                <TableRow key={rowIndex} className={cn('hover:bg-gray-50', row === highlightRow && 'query-row-headline')}
+                          aria-current={row === highlightRow ? 'true' : undefined}
+                          title={row === highlightRow ? 'The row the answer refers to' : undefined}>
                   {columns.map((col) => (
                     <TableCell key={col} className={cn('text-gray-900', isNumeric(col) && 'query-number')}>
                       {formatValue(row[col], col)}

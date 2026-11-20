@@ -8,6 +8,7 @@ import { DataTableWithExport } from './DataTableWithExport';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './query-results.css';
+import { headlineRow } from '../format';
 
 interface Message {
   id: string;
@@ -16,7 +17,7 @@ interface Message {
   timestamp: Date | string;
   chart?: any;
   data?: any[];
-  metadata?: { sqlSource?: string };
+  metadata?: { sqlSource?: string; queryType?: string };
 }
 
 interface ChatMessageProps {
@@ -169,6 +170,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             ) : (
               <DataTableWithExport 
                 data={message.data} 
+                highlightRow={headlineRow(message.metadata?.queryType, message.data)}
                 title="SeaTac Operations Analysis"
                 pageSize={5}
               />
@@ -188,6 +190,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="mt-4">
             <DataTableWithExport 
               data={message.data} 
+              highlightRow={headlineRow(message.metadata?.queryType, message.data)}
               title="Query Results"
               pageSize={5}
             />
