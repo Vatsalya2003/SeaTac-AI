@@ -14,6 +14,9 @@ export interface QueryResponse {
   insights?: string[];
   sql_queries?: string[];
   metric?: string;  // templates mode: the question's name, e.g. "Runway occupancy time"
+  definition?: string;
+  included_count?: number;
+  excluded?: Record<string, unknown>;
 }
 
 export async function queryAPI(query: string): Promise<QueryResponse> {
@@ -72,7 +75,10 @@ export async function queryAPI(query: string): Promise<QueryResponse> {
       use_case: data.use_case,
       insights: data.insights,
       sql_queries: data.sql_queries,
-      metric: data.metric
+      metric: data.metric,
+      definition: data.definition,
+      included_count: data.included_count,
+      excluded: data.excluded
     };
 
   } catch (error) {

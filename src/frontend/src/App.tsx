@@ -1,11 +1,12 @@
 import { queryAPI } from "./api/query";
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { ChatSidebar, SIDEBAR_DEFAULT, clampSidebarWidth, isMobileLayout } from './components/ChatSidebar';
 import { ChatMessage } from './components/ChatMessage';
 import { ChatInput } from './components/ChatInput';
 import { ChatWelcome } from './components/ChatWelcome';
 import { LoginPage } from './components/LoginPage';
 import { ThemeToggle, useTheme } from './theme';
+import { AnswerDetails, type AnswerMetadata } from './components/AnswerDetails';
 import { LogOut, PanelLeftOpen } from 'lucide-react';
 
 interface Message {
@@ -15,14 +16,7 @@ interface Message {
   timestamp: string | Date;
   chart?: any;
   data?: any[];
-  metadata?: {
-    outputFormat?: string;
-    outputConfidence?: number;
-    queryType?: string;
-    rowCount?: number;
-    sqlSource?: string;
-    metric?: string;
-  };
+  metadata?: AnswerMetadata;
 }
 
 interface ChatThread {
@@ -64,11 +58,15 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     clampSidebarWidth(Number(readSetting(SIDEBAR_WIDTH_KEY) ?? SIDEBAR_DEFAULT)));
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);  // answer whose details panel is open
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const closeDetails = useCallback(() => setDetailsFor(null), []);
+  useEffect(() => { setDetailsFor(null); }, [activeChat]);  // a different chat closes the panel
 
   // Remember the sidebar width and collapsed state
   useEffect(() => { writeSetting(SIDEBAR_WIDTH_KEY, String(sidebarWidth)); }, [sidebarWidth]);
@@ -226,7 +224,11 @@ export default function App() {
           queryType: response.use_case,
           rowCount: response.row_count || 0,
           sqlSource: response.sql_source,
-          metric: response.metric
+          metric: response.metric,
+          sqlQueries: response.sql_queries,
+          definition: response.definition,
+          includedCount: response.included_count,
+          excluded: response.excluded
         }
       };
 
@@ -366,7 +368,8 @@ export default function App() {
             <div className="sea-thread">
               {messages.map((message, i) => (
                 <ChatMessage key={message.id} message={message}
-                             question={messages[i - 1]?.role === 'user' ? messages[i - 1].content : undefined} />
+                             question={messages[i - 1]?.role === 'user' ? messages[i - 1].content : undefined}
+                             onShowDetails={message.role === 'assistant' ? () => setDetailsFor(message.id) : undefined} />
               ))}
               {isTyping && (
                 <div className="sea-loading" role="status">
@@ -380,6 +383,13 @@ export default function App() {
         </div>
 
         <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+
+        {(() => {
+          const shown = detailsFor ? messages.find(m => m.id === detailsFor) : undefined;
+          return shown ? (
+            <AnswerDetails content={shown.content} metadata={shown.metadata} onClose={closeDetails} />
+          ) : null;
+        })()}
       </div>
     </div>
   );
