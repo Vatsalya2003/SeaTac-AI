@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Copy, Check, BarChart3, Table as TableIcon, BadgeCheck, FlaskConical, Sparkles } from 'lucide-react';
+import { Copy, Check, BarChart3, Table as TableIcon, PanelRightOpen } from 'lucide-react';
+import { SourceBadge, badgeSource } from './AnswerSource';
+import type { AnswerMetadata } from './AnswerDetails';
 import { cn } from './ui/utils';
 import ChartVisualization from './ChartVisualization';
 import { DataTableWithExport } from './DataTableWithExport';
@@ -8,6 +10,7 @@ import { DataTableWithExport } from './DataTableWithExport';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import './query-results.css';
+import { headlineRow } from '../format';
 
 interface Message {
   id: string;
@@ -16,40 +19,27 @@ interface Message {
   timestamp: Date | string;
   chart?: any;
   data?: any[];
-  metadata?: { sqlSource?: string };
+  metadata?: AnswerMetadata;
 }
 
 interface ChatMessageProps {
   message: Message;
+  /** the question this answer replies to (used for titles when nothing better is known) */
+  question?: string;
+  /** opens the Answer details panel for this answer */
+  onShowDetails?: () => void;
 }
 
-// Badge above each answer, from the backend's sql_source. Greetings ('system') and answers that
-// couldn't be given ('none', or no sql_source) get no badge.
-const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: typeof BadgeCheck }> = {
-  template: { label: 'Verified answer', Icon: BadgeCheck,
-              className: 'answer-badge--verified' },
-  provisional: { label: 'Tested, provisional rule', Icon: FlaskConical,
-                 className: 'answer-badge--provisional' },
-  ai_sql: { label: 'AI-generated, not yet verified', Icon: Sparkles,
-            className: 'answer-badge--ai' },
-};
+const GENERIC_TITLES = /^(seatac operations( analysis)?|query results)?$/i;
 
-// A tested answer whose rule the Port hasn't confirmed yet: its notes say PROVISIONAL (Q7) or
-// PENDING PORT CONFIRMATION (Q3). The backend sends no separate flag, so the text decides.
-const PROVISIONAL_NOTE = /\bPROVISIONAL\b|PENDING PORT CONFIRMATION/;
-const badgeSource = (source: string | undefined, content: string) =>
-  source === 'template' && PROVISIONAL_NOTE.test(content) ? 'provisional' : source;
-
-function SourceBadge({ source }: { source?: string }) {
-  const badge = source ? SOURCE_BADGES[source] : undefined;
-  if (!badge) return null;
-  const { label, className, Icon } = badge;
-  return (
-    <div className={cn('answer-badge', className)} data-testid="answer-source-badge">
-      <Icon className="answer-badge-icon" aria-hidden="true" />
-      {label}
-    </div>
-  );
+// Title for the answer's table and chart, from the question: the chart's own title (tested answers),
+// else the question's name, else the question as asked. "(top 15)" is dropped for the table, which has every row.
+function resultTitle(chartTitle: string | undefined, metric: string | undefined, question: string | undefined) {
+  const fromChart = (chartTitle ?? '').trim();
+  if (!GENERIC_TITLES.test(fromChart)) return fromChart.replace(/\s*\(top \d+\)\s*$/i, '');
+  if (metric?.trim()) return metric.trim();
+  const q = (question ?? '').replace(/\s+/g, ' ').trim().replace(/\?$/, '');
+  return q ? (q.length > 80 ? `${q.slice(0, 79)}…` : q) : 'Results';
 }
 
 // "**Answer** (N rows):" label lines (templates and views modes). The "**Answer:**" sentence is kept.
@@ -59,8 +49,28 @@ const isTableLine = (line: string) => line.trimStart().startsWith('|');
 // Removes the row-count labels. When the reply has data rows, also removes the last markdown table:
 // it holds the same rows as message.data, which is shown below as the sortable, exportable data table.
 // Every other table (e.g. Q4's arrivals/departures summary, Q7's by-taxiway table) stays in the text.
+const HOURLY_ANSWERS = new Set(['Q2', 'Q3', 'Q10']);
+
+const NUMBER_CELL = /^-?[\d,]+(\.\d+)?$/;
+const cellsOf = (line: string) => line.trim().replace(/^\||\|$/g, '').split('|').map(c => c.trim());
+
+// Marks number columns right-aligned in each markdown table (|---:|), labels left (|:---|).
+function alignTableColumns(text: string): string {
+  const lines = text.split('\n');
+  for (let i = 1; i < lines.length; i++) {
+    if (!/^\s*\|(\s*:?-+:?\s*\|)+\s*$/.test(lines[i]) || !isTableLine(lines[i - 1])) continue;
+    let end = i + 1;
+    while (end < lines.length && isTableLine(lines[end])) end++;
+    const body = lines.slice(i + 1, end).map(cellsOf);
+    const numeric = cellsOf(lines[i]).map((_, c) => body.length > 0
+      && body.every(r => NUMBER_CELL.test(r[c] ?? '') || r[c] === 'No data') && body.some(r => NUMBER_CELL.test(r[c] ?? '')));
+    lines[i] = '|' + numeric.map(n => (n ? '---:' : ':---')).join('|') + '|';
+  }
+  return lines.join('\n');
+}
+
 function answerMarkdown(markdown: string, hasData: boolean): string {
-  const text = markdown.replace(ROW_COUNT_LABEL, '');
+  const text = alignTableColumns(markdown.replace(ROW_COUNT_LABEL, ''));
   if (!hasData) return text;
   const lines = text.split('\n');
   let end = lines.length - 1;
@@ -91,10 +101,15 @@ const markdownTables = {
   ),
 };
 
-export function ChatMessage({ message }: ChatMessageProps) {
+export function ChatMessage({ message, question, onShowDetails }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
-  const [viewMode, setViewMode] = useState<'chart' | 'table'>('table');
+  // hourly answers (Q2 taxi-out by hour, Q3 movement area by hour, Q10 peak hours) open on the chart
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>(
+    () => (HOURLY_ANSWERS.has(message.metadata?.queryType ?? '') && message.chart ? 'chart' : 'table'));
   const hasData = message.role === 'assistant' && !!message.data?.length;
+  const tableTitle = resultTitle(message.chart?.title, message.metadata?.metric, question);
+  const chartConfig = message.chart && GENERIC_TITLES.test((message.chart.title ?? '').trim())
+    ? { ...message.chart, title: tableTitle } : message.chart;
   const detailStart = message.role === 'assistant'
     ? message.content.search(/\*\*(?:Sample|Definition)[^\n]*?:\*\*/)
     : -1;
@@ -129,9 +144,15 @@ export function ChatMessage({ message }: ChatMessageProps) {
         <div className="sea-msg-meta">
           <span className="sea-msg-author">SeaTac AI</span>
           <time dateTime={new Date(message.timestamp).toISOString()}>{formatTime(message.timestamp)}</time>
+          {onShowDetails && (details || message.metadata?.sqlQueries?.length) ? (
+            <button type="button" className="sea-details-link" onClick={onShowDetails} aria-haspopup="dialog"
+                    data-testid="answer-details-link">
+              <PanelRightOpen aria-hidden="true" /> Details
+            </button>
+          ) : null}
         </div>
 
-        <SourceBadge source={badgeSource(message.metadata?.sqlSource, message.content)} />
+        <SourceBadge source={badgeSource(message.metadata?.sqlSource, message.content, message.metadata?.ruleStatus)} />
 
         {/* Markdown content */}
         <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">
@@ -165,11 +186,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             </div>
 
             {viewMode === 'chart' ? (
-              <ChartVisualization chartConfig={message.chart} insightsText={message.content} />
+              <ChartVisualization chartConfig={chartConfig} insightsText={message.content} />
             ) : (
               <DataTableWithExport 
                 data={message.data} 
-                title="SeaTac Operations Analysis"
+                highlightRow={headlineRow(message.metadata?.queryType, message.data)}
+                title={tableTitle}
                 pageSize={5}
               />
             )}
@@ -179,7 +201,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
         {/* Chart Only (no table data) */}
         {message.role === 'assistant' && message.chart && (!message.data || message.data.length === 0) && (
           <div className="mt-4">
-            <ChartVisualization chartConfig={message.chart} insightsText={message.content} />
+            <ChartVisualization chartConfig={chartConfig} insightsText={message.content} />
           </div>
         )}
 
@@ -188,19 +210,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <div className="mt-4">
             <DataTableWithExport 
               data={message.data} 
-              title="Query Results"
+              highlightRow={headlineRow(message.metadata?.queryType, message.data)}
+              title={tableTitle}
               pageSize={5}
             />
           </div>
         )}
 
-        {details && (
-          <div className="query-calculation-details">
-            <div className="query-details-body">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{details}</ReactMarkdown>
-            </div>
-          </div>
-        )}
 
         <div className="sea-msg-actions">
           <button type="button" className="sea-btn sea-btn-ghost sea-copy" onClick={copyToClipboard}>

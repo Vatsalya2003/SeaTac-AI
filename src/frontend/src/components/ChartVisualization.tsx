@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Chart as ChartJS, registerables } from 'chart.js';
+import { formatHour } from '../format';
 import { Button } from './ui/button';
 import { Download, Image as ImageIcon, FileText, Check, BarChart3, LineChart, PieChart } from 'lucide-react';
 
@@ -33,6 +34,9 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
   const [ignoreUnknown, setIgnoreUnknown] = useState(false);
   const hasUnknown = chartConfig.data.labels.some(label => String(label).trim().toLowerCase() === 'unknown');
   const displayData = useMemo(() => {
+    // Hour-of-day labels sent as 0-23 (views mode) are shown as "00:00" … "23:00" like the tested answers
+    const hourly = /\bhour/i.test(`${chartConfig.title ?? ''} ${JSON.stringify(chartConfig.options?.scales?.x?.title ?? '')}`)
+      && chartConfig.data.labels.length > 0 && chartConfig.data.labels.every(label => formatHour(label) !== null);
     const indices = chartConfig.data.labels
       .map((_, index) => index)
       .filter(index => !ignoreUnknown || String(chartConfig.data.labels[index]).trim().toLowerCase() !== 'unknown');
@@ -40,7 +44,7 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
       ? indices.map(index => colors[index]) : colors;
     return {
       ...chartConfig.data,
-      labels: indices.map(index => chartConfig.data.labels[index]),
+      labels: indices.map(index => hourly ? formatHour(chartConfig.data.labels[index]) as string : chartConfig.data.labels[index]),
       datasets: chartConfig.data.datasets.map(dataset => ({
         ...dataset,
         data: indices.map(index => dataset.data[index]),

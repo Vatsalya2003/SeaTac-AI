@@ -55,7 +55,7 @@ metrics:
     value_column: duration_min
     selection: "Departures selected by off-block time (selection_time = actual_off_block), not sea_date: a flight pushing back before midnight belongs to the earlier day."
     allowed_groupings: [selection_hour, selection_date, aircraft_type_group, weight_class_group, carrier, runway, gate]
-    source: "Off-block time is Aerobahn's Actual Off Block Time (confirmed by the Port)."
+    source: "Off-block time is Aerobahn's Actual Off Block Time (confirmed by the Port on Oct 19)."
     known_limits:
       - "Hour of day is the local hour of actual off-block (selection_hour, also available as off_block_hour)."
       - "The export's own Actual Taxi Out Time uses AODB off-block, so it differs from this metric by design."

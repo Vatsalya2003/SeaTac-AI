@@ -18,6 +18,7 @@ import {
   Download
 } from 'lucide-react';
 import { cn } from './ui/utils';
+import { formatHour, isHourColumn } from '../format';
 
 interface DataTableProps {
   data: any[];
@@ -27,9 +28,14 @@ interface DataTableProps {
   searchable?: boolean;
   sortable?: boolean;
   exportable?: boolean;
+  /** the row the answer's headline is about (same object as in data), highlighted; none if undefined */
+  highlightRow?: any;
 }
 
 type SortDirection = 'asc' | 'desc' | null;
+
+// Search and the "Showing X of Y rows" line only for longer tables
+const LONG_TABLE_ROWS = 25;
 
 export function DataTableWithExport({ 
   data, 
@@ -38,7 +44,8 @@ export function DataTableWithExport({
   pageSize = 5,
   searchable = true,
   sortable = true,
-  exportable = true
+  exportable = true,
+  highlightRow
 }: DataTableProps) {
   // Extract columns from data if not provided
   const columns = providedColumns || (data.length > 0 ? Object.keys(data[0]) : []);
@@ -90,6 +97,9 @@ export function DataTableWithExport({
   const startIndex = 0;
   const endIndex = expanded ? sortedData.length : pageSize;
   const paginatedData = sortedData.slice(0, endIndex);
+  // keep the highlighted row visible in the short preview: shown after a "⋯" row if it would be hidden
+  const pinnedRow = !expanded && highlightRow !== undefined && sortedData.includes(highlightRow)
+    && !paginatedData.includes(highlightRow) ? highlightRow : undefined;
 
   // Handle sort
   const handleSort = (column: string) => {
@@ -114,7 +124,7 @@ export function DataTableWithExport({
     const headers = columns.join(',');
     const rows = sortedData.map(row =>
       columns.map(col => {
-        const value = row[col];
+        const value = isHourColumn(col) ? formatHour(row[col]) ?? row[col] : row[col];
         // Escape commas and quotes
         const escaped = String(value ?? '').replace(/"/g, '""');
         return `"${escaped}"`;
@@ -132,9 +142,11 @@ export function DataTableWithExport({
   };
 
   // Format cell value
-  const isNumeric = (col: string) => data.some(row => typeof row[col] === 'number');
+  // numbers are right-aligned; hours (00:00) are labels, left-aligned
+  const isNumeric = (col: string) => !isHourColumn(col) && data.some(row => typeof row[col] === 'number');
   const formatValue = (value: any, col: string): string => {
     if (value == null) return 'No data';
+    if (isHourColumn(col)) return formatHour(value) ?? String(value);  // 0-23 -> "00:00" … "23:00"
     if (typeof value === 'number') {
       const average = /^avg_|^average_/.test(col);
       return value.toLocaleString('en-US', {
@@ -173,9 +185,11 @@ export function DataTableWithExport({
           {title && (
             <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           )}
-          <p className="text-sm text-gray-500 mt-1">
-            Showing {sortedData.length ? startIndex + 1 : 0}–{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
-          </p>
+          {data.length >= LONG_TABLE_ROWS && (
+            <p className="text-sm text-gray-500 mt-1">
+              Showing {sortedData.length ? startIndex + 1 : 0}–{Math.min(endIndex, sortedData.length)} of {sortedData.length} rows
+            </p>
+          )}
         </div>
         
         {exportable && data.length > 0 && (
@@ -192,7 +206,7 @@ export function DataTableWithExport({
       </div>
 
       {/* Search Bar */}
-      {searchable && data.length > 10 && (
+      {searchable && data.length >= LONG_TABLE_ROWS && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
@@ -253,8 +267,14 @@ export function DataTableWithExport({
                 </TableCell>
               </TableRow>
             ) : (
-              paginatedData.map((row, rowIndex) => (
-                <TableRow key={rowIndex} className="hover:bg-gray-50">
+              [...paginatedData, ...(pinnedRow ? [null, pinnedRow] : [])].map((row, rowIndex) => row === null ? (
+                <TableRow key="gap" className="query-row-gap" aria-hidden="true">
+                  <TableCell colSpan={columns.length}>⋯</TableCell>
+                </TableRow>
+              ) : (
+                <TableRow key={rowIndex} className={cn('hover:bg-gray-50', row === highlightRow && 'query-row-headline')}
+                          aria-current={row === highlightRow ? 'true' : undefined}
+                          title={row === highlightRow ? 'The row the answer refers to' : undefined}>
                   {columns.map((col) => (
                     <TableCell key={col} className={cn('text-gray-900', isNumeric(col) && 'query-number')}>
                       {formatValue(row[col], col)}

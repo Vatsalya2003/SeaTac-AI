@@ -129,5 +129,5 @@ The Stage 2 guide was written on macOS. On Windows:
   - Don't commit `src/frontend/frontend.log` or the local `package-lock.json` change.
 - [ ] **Each teammate:** follow SETUP_GUIDE Step 8 on your own laptop, with your own Gemini key, ask the 10 questions, and report anything that differs from §3.
 - [ ] **Test more phrasings** of the 10 questions in the chatbot (the ground truth has 2 per question). Note any that go to views mode by mistake, and we'll add keywords or menu text.
-- [ ] **Ask the Port to confirm** the provisional items (Q3 hatched area, Q7 section-entry time, off-block time source for Q2).
+- [ ] **Ask the Port to confirm** the provisional items (Q3 hatched area, Q7 section-entry time, Q10 counting the take-off with no runway). Q2's off-block time source (Aerobahn) was confirmed on Oct 19.
 - [ ] Later: extend the templates beyond the 10 questions (other groupings, filters such as runway or hour), using the same pattern: tested SQL, ground-truth tests, then intent menu entry.

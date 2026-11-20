@@ -357,6 +357,15 @@ def _sample_text(sql, run):
     return notes
 
 
+def provisional_note(text):
+    """metric_rules.yaml marks unconfirmed rules "PENDING PORT CONFIRMATION: …" or "PROVISIONAL …: …".
+    Shown to users as "Provisional: …; awaiting Port confirmation." (same wording as the tested answers)."""
+    m = re.match(r"\s*(?:PENDING PORT CONFIRMATION|PROVISIONAL(?: PROXY)?)(?:,\s*pending Port confirmation)?\s*:\s*(.*)",
+                 text, re.S | re.I)
+    body = (m.group(1) if m else text).strip().rstrip(".")
+    return f"Provisional: {body}; awaiting Port confirmation."
+
+
 def _definitions(sql):
     metrics = (metric_rules() or {}).get("metrics", {})
     out = []
@@ -366,10 +375,10 @@ def _definitions(sql):
                 out.append(f"**Definition ({name.replace('_', ' ')}):** {m.get('definition', '').strip()}")
                 for limit in m.get("known_limits", []):
                     if "PENDING" in limit or "PROVISIONAL" in limit:
-                        out.append(f"_Note: {limit}_")
+                        out.append(f"_Note: {provisional_note(limit)}_")
                 sel = m.get("selection", "")
                 if "PROVISIONAL" in sel:
-                    out.append(f"_Note: {sel}_")
+                    out.append(f"_Note: {provisional_note(sel)}_")
     return out
 
 
@@ -381,5 +390,6 @@ def build_answer(sql, rows, run):
     except Exception as e:
         parts.append(f"_(Sample size could not be calculated: {e})_")
     parts += _definitions(sql)
-    parts.append("_Times are SEA local (PDT). Averages are rounded to 2 decimals._")
+    has_averages = bool(re.search(r"\bavg\s*\(", sql, re.I)) or any(str(k).lower().startswith("avg") for k in (rows[0] if rows else {}))
+    parts.append("_Times are SEA local (PDT)." + (" Averages are rounded to 2 decimals._" if has_averages else "_"))
     return "\n\n".join(parts)

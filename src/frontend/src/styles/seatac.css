@@ -436,3 +436,93 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 /* data-table search box: centre its magnifier icon (its Tailwind classes aren't in the pre-built CSS) */
 .sea-msg-assistant .relative > svg.absolute.left-3 { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
 .sea-msg-assistant .relative > svg.absolute.left-3 ~ input { padding-left: 36px; }
+
+/* the data-table row the answer's headline is about */
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline,
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline:nth-child(even) { background: var(--sea-accent-tint); }
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline td { font-weight: 600; }
+.sea-msg-assistant .query-data-table tbody tr.query-row-headline td:first-child { box-shadow: inset 3px 0 0 var(--sea-accent); }
+.sea-msg-assistant .query-data-table tbody tr.query-row-gap td { padding: 2px 10px; color: var(--sea-ink-muted); text-align: center; line-height: 1; }
+:root[data-theme="dark"] .sea-app .query-data-table tbody tr.query-row-headline { background: var(--sea-accent-tint); }
+
+/* narrower tables: as wide as their content (up to the card), labels left, numbers right */
+.sea-msg-assistant .rounded-lg.border.overflow-hidden,
+.sea-msg-assistant .query-md-table { width: fit-content; max-width: 100%; }
+.sea-msg-assistant .query-data-table { width: auto; }
+.sea-msg-assistant .query-data-table th { text-align: left; }
+.sea-msg-assistant .query-data-table th.query-number,
+.sea-msg-assistant .query-data-table td.query-number { text-align: right; }
+.sea-msg-assistant .query-data-table th, .sea-msg-assistant .query-data-table td { min-width: 64px; }
+
+/* ---- answer details: link on each answer, side panel (slide-up sheet on small screens) ---------------------- */
+.sea-details-link {
+  margin-left: auto; display: inline-flex; align-items: center; gap: 5px; padding: 2px 6px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--sea-accent-strong); font: inherit; font-size: var(--sea-text-sm); font-weight: 500;
+  cursor: pointer; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: transparent;
+}
+.sea-details-link:hover { text-decoration-color: currentColor; background: var(--sea-accent-tint); }
+.sea-details-link svg { width: 15px; height: 15px; }
+.sea-msg-meta { align-items: center; }
+
+.sea-details-backdrop { position: fixed; inset: 0; z-index: 60; background: rgba(26, 34, 41, 0.28); animation: sea-fade 0.15s ease; }
+.sea-details {
+  position: fixed; top: 0; right: 0; bottom: 0; z-index: 61; width: min(440px, 100vw);
+  display: flex; flex-direction: column; background: var(--sea-surface); color: var(--sea-ink);
+  border-left: 1px solid var(--sea-mist); box-shadow: -8px 0 32px rgba(26, 34, 41, 0.16);
+  font-size: var(--sea-text); line-height: var(--sea-leading); animation: sea-slide-in 0.2s ease;
+}
+.sea-details :focus-visible { outline: 2px solid var(--sea-accent-strong); outline-offset: 2px; }
+.sea-details-head {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 12px 12px 20px;
+  border-bottom: 1px solid var(--sea-mist); flex-shrink: 0;
+}
+.sea-details-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.sea-details-body { flex: 1; overflow-y: auto; padding: 16px 20px 28px; }
+.sea-details-body section { margin-top: 20px; }
+.sea-details-body h3 {
+  margin: 0 0 6px; font-size: var(--sea-text-xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--sea-ink-muted);
+}
+.sea-details-body p { margin: 0 0 8px; }
+.sea-details-muted { color: var(--sea-ink-muted); font-size: var(--sea-text-sm); }
+.sea-details-notes { margin: 0; padding-left: 18px; list-style: disc; }
+.sea-details-notes li::marker { color: var(--sea-ink-muted); }
+.sea-details-notes li { margin-bottom: 6px; }
+.sea-details-notes li p { margin: 0; }
+.sea-details-excluded { margin: 6px 0 0; border: 1px solid var(--sea-mist); border-radius: var(--sea-radius-sm); overflow: hidden; }
+.sea-details-excluded > div { display: flex; justify-content: space-between; gap: 12px; padding: 6px 12px; font-size: var(--sea-text-sm); }
+.sea-details-excluded > div + div { border-top: 1px solid var(--sea-mist); }
+.sea-details-excluded dt { color: var(--sea-ink-muted); }
+.sea-details-excluded dd { margin: 0; font-variant-numeric: tabular-nums; }
+.sea-details-sql { margin-top: 8px; border: 1px solid var(--sea-mist); border-radius: var(--sea-radius-sm); overflow: hidden; }
+.sea-details-sql-head {
+  display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 4px 12px;
+  background: var(--sea-mist-light); font-size: var(--sea-text-xs); color: var(--sea-ink-muted);
+}
+.sea-details-sql pre {
+  margin: 0; padding: 10px 12px; max-height: 260px; overflow: auto; background: var(--sea-card);
+  font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--sea-ink); white-space: pre-wrap; word-break: break-word;
+}
+.sea-details .answer-badge { margin-bottom: 0; }
+.sea-details .answer-badge--verified { border-color: #bfe6a8; background: var(--sea-accent-tint); color: var(--sea-accent-strong); }
+.sea-details .answer-badge--provisional { border-color: var(--badge-provisional-border); background: var(--badge-provisional-bg); color: var(--badge-provisional-text); }
+.sea-details .answer-badge--ai { border-color: var(--badge-ai-border); background: var(--badge-ai-bg); color: var(--badge-ai-text); }
+:root[data-theme="dark"] .sea-details .answer-badge--verified { border-color: #355a24; }
+:root[data-theme="dark"] .sea-details-backdrop { background: rgba(0, 0, 0, 0.5); }
+
+@keyframes sea-fade { from { opacity: 0; } }
+@keyframes sea-slide-in { from { transform: translateX(24px); opacity: 0; } }
+@keyframes sea-slide-up { from { transform: translateY(32px); opacity: 0; } }
+@media (max-width: 767px) {
+  .sea-details {
+    top: auto; left: 0; width: 100%; max-height: 85vh; max-height: 85dvh; border-left: 0; border-top: 1px solid var(--sea-mist);
+    border-radius: 16px 16px 0 0; box-shadow: 0 -8px 32px rgba(26, 34, 41, 0.18); animation-name: sea-slide-up;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .sea-details-head { position: relative; padding-top: 18px; }
+  .sea-details-head::before {  /* sheet grabber */
+    content: ""; position: absolute; top: 6px; left: 50%; width: 36px; height: 4px; margin-left: -18px;
+    border-radius: 2px; background: var(--sea-mist);
+  }
+}
+@media (prefers-reduced-motion: reduce) { .sea-details, .sea-details-backdrop { animation: none; } }

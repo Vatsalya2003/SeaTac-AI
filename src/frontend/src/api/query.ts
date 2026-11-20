@@ -13,6 +13,11 @@ export interface QueryResponse {
   use_case?: string;
   insights?: string[];
   sql_queries?: string[];
+  metric?: string;  // templates mode: the question's name, e.g. "Runway occupancy time"
+  definition?: string;
+  included_count?: number;
+  excluded?: Record<string, unknown>;
+  rule_status?: string;  // templates mode: 'confirmed' or 'provisional'
 }
 
 export async function queryAPI(query: string): Promise<QueryResponse> {
@@ -70,7 +75,12 @@ export async function queryAPI(query: string): Promise<QueryResponse> {
       sql_source: data.sql_source,
       use_case: data.use_case,
       insights: data.insights,
-      sql_queries: data.sql_queries
+      sql_queries: data.sql_queries,
+      metric: data.metric,
+      definition: data.definition,
+      included_count: data.included_count,
+      excluded: data.excluded,
+      rule_status: data.rule_status
     };
 
   } catch (error) {

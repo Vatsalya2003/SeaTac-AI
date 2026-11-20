@@ -27,26 +27,29 @@ class IntentError(ValueError):
     """The question id or a filter isn't valid for templates mode (the caller falls back to stage 1)."""
 
 
+# rule_status: "confirmed" = every rule behind the answer is confirmed by the Port; "provisional" = it depends on a
+# working assumption or team rule the Port hasn't confirmed yet (Q3 hatched-area boundary, Q7 section-entry proxy
+# time, Q10 counting the take-off with no runway). Q2's Aerobahn off-block time was confirmed by the Port on Oct 19.
 QUESTIONS = {
-    "Q1": {"title": "Taxi-in time by aircraft type", "metrics": ["taxi_in"],
+    "Q1": {"rule_status": "confirmed", "title": "Taxi-in time by aircraft type", "metrics": ["taxi_in"],
            "description": "average taxi-in time (wheels down to parking) for each aircraft type"},
-    "Q2": {"title": "Taxi-out time by hour of day", "metrics": ["taxi_out"],
+    "Q2": {"rule_status": "confirmed", "title": "Taxi-out time by hour of day", "metrics": ["taxi_out"],
            "description": "average taxi-out time (off-block to take-off) for each local hour of the day"},
-    "Q3": {"title": "Movement area occupancy", "metrics": ["movement_area_peak"],
+    "Q3": {"rule_status": "provisional", "title": "Movement area occupancy", "metrics": ["movement_area_peak"],
            "description": "most aircraft in the movement area at the same time, for each hour"},
-    "Q4": {"title": "Runway occupancy time", "metrics": ["runway_occupancy"],
+    "Q4": {"rule_status": "confirmed", "title": "Runway occupancy time", "metrics": ["runway_occupancy"],
            "description": "how long aircraft stay on the runway, arrivals and departures, overall and by runway"},
-    "Q5": {"title": "Take-off (wheels-up) delay", "metrics": ["takeoff_delay"],
+    "Q5": {"rule_status": "confirmed", "title": "Take-off (wheels-up) delay", "metrics": ["takeoff_delay"],
            "description": "average delay of actual take-off compared with the scheduled take-off time"},
-    "Q6": {"title": "Taxi times by weight class", "metrics": ["taxi_in", "taxi_out"],
+    "Q6": {"rule_status": "confirmed", "title": "Taxi times by weight class", "metrics": ["taxi_in", "taxi_out"],
            "description": "average taxi-in and taxi-out times by ICAO weight class (light, medium, heavy)"},
-    "Q7": {"title": "Taxiway usage", "metrics": ["taxiway_usage"],
+    "Q7": {"rule_status": "provisional", "title": "Taxiway usage", "metrics": ["taxiway_usage"],
            "description": "how many flights used each taxiway or taxiway section"},
-    "Q8": {"title": "Wheels-down to parking time", "metrics": ["taxi_in"],
+    "Q8": {"rule_status": "confirmed", "title": "Wheels-down to parking time", "metrics": ["taxi_in"],
            "description": "one overall average time from wheels down (touchdown) to parking for all arrivals"},
-    "Q9": {"title": "Runway activity", "metrics": ["runway_utilization"],
+    "Q9": {"rule_status": "confirmed", "title": "Runway activity", "metrics": ["runway_utilization"],
            "description": "number of take-offs and landings on each runway, and which runway was used most"},
-    "Q10": {"title": "Peak hours (history only)", "metrics": ["peak_hours"],
+    "Q10": {"rule_status": "provisional", "title": "Peak hours (history only)", "metrics": ["peak_hours"],
             "description": "the busiest hours of the day by number of take-offs plus landings"},
 }
 
@@ -259,6 +262,11 @@ def _show(sql, params):
     return out
 
 
+def footer(has_averages):
+    """Last line of every answer; the rounding note only when the answer shows averages."""
+    return "_Times are SEA local (PDT)." + (" Averages are rounded to 2 decimals._" if has_averages else "_")
+
+
 def answer(qid, run, day=DEFAULT_DAY):
     """Run the templates for one question. run(sql, params) -> list of dict rows (read-only connection).
 
@@ -271,6 +279,7 @@ def answer(qid, run, day=DEFAULT_DAY):
         return {"answer": f"**No data for {day}.** The data covers one operating day at SEA: {DEFAULT_DAY}. "
                           f"Ask about {DEFAULT_DAY}, or leave the date out.",
                 "data": [], "chart": None, "sql_queries": sql_queries, "metric": QUESTIONS[qid]["title"],
+                "rule_status": QUESTIONS[qid]["rule_status"],
                 "definition": " ".join(d for _, d in _definitions(qid)), "included_count": 0, "excluded": {}}
     res = {name: clean(run(sql, params)) for name, sql, params in queries}
     built = BUILDERS[qid](res, run, day)
@@ -284,8 +293,11 @@ def answer(qid, run, day=DEFAULT_DAY):
     parts.append(f"**Sample:** based on {built['sample']}.")
     parts += [f"**Definition ({name}):** {d}" for name, d in definitions]
     parts += [f"_Note: {x}_" for x in built.get("notes", [])]
-    parts.append("_Times are SEA local (PDT). Averages are rounded to 2 decimals._")
+    has_averages = (any(k.startswith("avg_") for row in built["data"] for k in row)
+                    or any("Avg" in t for t in built.get("tables", [])))
+    parts.append(footer(has_averages))
     return {"answer": "\n\n".join(parts), "data": built["data"], "chart": built.get("chart"),
+            "rule_status": QUESTIONS[qid]["rule_status"],
             "sql_queries": sql_queries, "metric": QUESTIONS[qid]["title"],
             "definition": " ".join(d for _, d in definitions),
             "included_count": built["included"], "excluded": built.get("excluded", {})}
@@ -332,8 +344,7 @@ def _q2(res, run, day):
                      f"({r2(lo['avg_taxi_out_min'])} min, {n(lo['flights'])} flights).")
     if empty:
         head += f" No data (no departures): {', '.join(empty)}."
-    notes = ["Hours are the local hour the aircraft left parking (off-block), not the take-off hour.",
-             "PENDING PORT CONFIRMATION: off-block time is Aerobahn's Actual Off Block Time (the team's working assumption)."]
+    notes = ["Hours are the local hour the aircraft left parking (off-block), not the take-off hour."]
     chart = _chart("line", "Average taxi-out time by hour of off-block", [hour_label(r["off_block_hour"]) for r in rows],
                    [("Average taxi-out (min)", [r["avg_taxi_out_min"] for r in rows])], "Minutes")
     return {"headline": head, "tables": [_table(rows, ["off_block_hour", "avg_taxi_out_min", "flights"],
@@ -359,9 +370,9 @@ def _q3(res, run, day):
     data = [{"local_hour": r["local_hour"], "max_aircraft_in_area": r["max_aircraft_in_area"]} for r in rows]
     notes = ["This is the highest number of aircraft present at the same moment, not the number of aircraft "
              "that passed through during the hour.",
-             "PENDING PORT CONFIRMATION: the hatched movement-area boundary is mapped to the export's Movement Area "
-             "Entrance/Exit times (working assumption)."]
-    chart = _chart("bar", "Most aircraft in the movement area at the same time, by hour",
+             "Provisional: the hatched movement-area boundary is mapped to the export's Movement Area "
+             "Entrance/Exit times (working assumption); awaiting Port confirmation."]
+    chart = _chart("bar", "Peak aircraft in the movement area, by hour",
                    [hour_label(r["local_hour"]) for r in rows], [("Aircraft at once", [r["max_aircraft_in_area"] for r in rows])],
                    "Aircraft")
     return {"headline": head, "tables": [_table(data, ["local_hour", "max_aircraft_in_area"], ["Hour", "Most aircraft at once"])],
@@ -419,7 +430,7 @@ def _q6(res, run, day):
     data = [{"weight_class": a["weight_class"], "avg_taxi_in_min": a["avg_taxi_in_min"], "arrivals": a["flights"],
              "avg_taxi_out_min": b["avg_taxi_out_min"], "departures": b["flights"]} for a, b in zip(t_in, t_out)]
     notes = ["Weight class is the ICAO classification (Weight Class (ICAO)). Arrival and departure averages are shown separately.",
-             "Taxi-out uses the Q2 interval (off-block to take-off; off-block source pending Port confirmation)."]
+             "Taxi-out uses the Q2 interval (off-block to take-off)."]
     if any(r["flights"] and r["flights"] < 10 for r in t_in + t_out):
         notes.append("Some classes have fewer than 10 flights and may not be representative.")
     shown = [r for r in data if r["arrivals"] or r["departures"]]
@@ -450,8 +461,8 @@ def _q7(res, run, day):
     notes = ["Each flight is counted once per section, even if it used that section more than once.",
              "Tango (T), Hotel (H) and Whiskey (W) do not appear in this data: the export only records the section used "
              "to enter or exit the runway and the ramp, not the full taxi route.",
-             "PROVISIONAL: the export has no per-section entry time, so the reporting day is selected by a proxy time "
-             "(runway or movement-area entry/exit), pending Port confirmation. The missed approach is not included."]
+             "Provisional: the export has no per-section entry time, so the reporting day is selected by a proxy time "
+             "(runway or movement-area entry/exit); awaiting Port confirmation. The missed approach is not included."]
     chart = _chart("bar", "Flights per taxiway section (top 15)", [r["taxiway_section"] for r in seg[:15]],
                    [("Flights", [r["flights"] for r in seg[:15]])], "Flights")
     tables = [_table(twy, ["taxiway_name", "taxiway_letter", "flights"], ["Taxiway", "Letter", "Flights"]),
@@ -516,7 +527,9 @@ def _q10(res, run, day):
     notes = ["History only: this describes past activity on one day and is not a forecast.",
              "Every take-off and completed landing counts, including a take-off with no runway recorded (a runway is "
              "not needed for this count), so the total can be higher than in runway activity. The missed approach is "
-             "not counted."]
+             "not counted.",
+             "Provisional: counting the take-off with no runway recorded is a team rule (the ground truth file leaves it "
+             "out); awaiting Port confirmation."]
     chart = _chart("bar", "Take-offs plus landings by hour", [hour_label(r["local_hour"]) for r in rows],
                    [("Take-offs", [r["takeoffs"] for r in rows]), ("Landings", [r["landings"] for r in rows])], "Operations")
     return {"headline": head, "tables": [_table(ranked, ["hour_rank", "local_hour", "takeoffs", "landings", "operations"],

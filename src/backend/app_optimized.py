@@ -1216,6 +1216,7 @@ class QueryResponse(BaseModel):
     definition: Optional[str] = None
     included_count: Optional[int] = None
     excluded: Optional[Dict[str, Any]] = None
+    rule_status: Optional[str] = None  # templates mode: 'confirmed' or 'provisional' (rule not yet confirmed by the Port)
 
 def answer_source(result: Dict[str, Any]) -> str:
     """sql_source sent to the frontend, which shows it as a badge above the answer:
@@ -1964,6 +1965,7 @@ Return ONLY the SQL query, no explanations or markdown.
             'output_confidence': 1.0,
             'sql_source': 'template',
             'metric': out['metric'],
+            'rule_status': out.get('rule_status'),
             'definition': out['definition'],
             'included_count': out['included_count'],
             'excluded': out['excluded'],
@@ -2085,6 +2087,7 @@ async def handle_query(request: QueryRequest):
             output_confidence=result.get('output_confidence'),
             sql_source=answer_source(result),  # template / ai_sql / none: drives the answer badge
             metric=result.get('metric'),
+            rule_status=result.get('rule_status'),
             definition=result.get('definition'),
             included_count=result.get('included_count'),
             excluded=result.get('excluded')
