@@ -241,7 +241,9 @@ def test_every_answer_has_definition_and_sample(ans):
         a = ans(f"Q{i}")
         assert a["answer"].startswith("**Answer:**"), f"Q{i} answer first, like views mode"
         assert "**Definition (" in a["answer"] and "**Sample:** based on" in a["answer"], f"Q{i} answer parts"
-        assert a["answer"].endswith("_Times are SEA local (PDT). Averages are rounded to 2 decimals._"), f"Q{i} footer"
+        averages = i in (1, 2, 4, 5, 6, 8)  # answers that show averages; Q3, Q7, Q9, Q10 are counts
+        footer = "_Times are SEA local (PDT)." + (" Averages are rounded to 2 decimals._" if averages else "_")
+        assert a["answer"].endswith(footer), f"Q{i} footer"
         assert a["definition"] and a["included_count"] > 0, f"Q{i} metadata"
 
 

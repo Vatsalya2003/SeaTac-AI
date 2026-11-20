@@ -381,5 +381,6 @@ def build_answer(sql, rows, run):
     except Exception as e:
         parts.append(f"_(Sample size could not be calculated: {e})_")
     parts += _definitions(sql)
-    parts.append("_Times are SEA local (PDT). Averages are rounded to 2 decimals._")
+    has_averages = bool(re.search(r"\bavg\s*\(", sql, re.I)) or any(str(k).lower().startswith("avg") for k in (rows[0] if rows else {}))
+    parts.append("_Times are SEA local (PDT)." + (" Averages are rounded to 2 decimals._" if has_averages else "_"))
     return "\n\n".join(parts)

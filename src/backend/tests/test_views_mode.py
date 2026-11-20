@@ -398,3 +398,10 @@ def test_endpoint_gives_no_label_to_rejected_sql_or_greetings(app, monkeypatch):
     monkeypatch.setattr(app, "greeting_handler", app.GreetingHandler(None))  # no AI client: built-in reply
     r = _ask_endpoint(app, monkeypatch, "SELECT 1", "hi")
     assert r.sql_source == "system"
+
+
+def test_rounding_note_only_with_averages(vm):
+    avg = vm.build_answer("SELECT AVG(duration_min) AS avg_taxi_in_min FROM v_taxi_in", [{"avg_taxi_in_min": 1.5}], lambda *a: [])
+    count = vm.build_answer("SELECT COUNT(*) AS flights FROM v_taxi_in", [{"flights": 3}], lambda *a: [])
+    assert avg.endswith("Averages are rounded to 2 decimals._")
+    assert count.endswith("_Times are SEA local (PDT)._") and "Averages are rounded" not in count

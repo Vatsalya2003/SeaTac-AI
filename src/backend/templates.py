@@ -259,6 +259,11 @@ def _show(sql, params):
     return out
 
 
+def footer(has_averages):
+    """Last line of every answer; the rounding note only when the answer shows averages."""
+    return "_Times are SEA local (PDT)." + (" Averages are rounded to 2 decimals._" if has_averages else "_")
+
+
 def answer(qid, run, day=DEFAULT_DAY):
     """Run the templates for one question. run(sql, params) -> list of dict rows (read-only connection).
 
@@ -284,7 +289,9 @@ def answer(qid, run, day=DEFAULT_DAY):
     parts.append(f"**Sample:** based on {built['sample']}.")
     parts += [f"**Definition ({name}):** {d}" for name, d in definitions]
     parts += [f"_Note: {x}_" for x in built.get("notes", [])]
-    parts.append("_Times are SEA local (PDT). Averages are rounded to 2 decimals._")
+    has_averages = (any(k.startswith("avg_") for row in built["data"] for k in row)
+                    or any("Avg" in t for t in built.get("tables", [])))
+    parts.append(footer(has_averages))
     return {"answer": "\n\n".join(parts), "data": built["data"], "chart": built.get("chart"),
             "sql_queries": sql_queries, "metric": QUESTIONS[qid]["title"],
             "definition": " ".join(d for _, d in definitions),
