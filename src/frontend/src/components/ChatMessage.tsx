@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from './ui/button';
-import { Copy, Check, BarChart3, Table as TableIcon, BadgeCheck, Sparkles } from 'lucide-react';
+import { Copy, Check, BarChart3, Table as TableIcon, BadgeCheck, FlaskConical, Sparkles } from 'lucide-react';
 import { cn } from './ui/utils';
 import ChartVisualization from './ChartVisualization';
 import { DataTableWithExport } from './DataTableWithExport';
@@ -28,9 +28,17 @@ interface ChatMessageProps {
 const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: typeof BadgeCheck }> = {
   template: { label: 'Verified answer', Icon: BadgeCheck,
               className: 'answer-badge--verified' },
+  provisional: { label: 'Tested, provisional rule', Icon: FlaskConical,
+                 className: 'answer-badge--provisional' },
   ai_sql: { label: 'AI-generated, not yet verified', Icon: Sparkles,
             className: 'answer-badge--ai' },
 };
+
+// A tested answer whose rule the Port hasn't confirmed yet: its notes say PROVISIONAL (Q7) or
+// PENDING PORT CONFIRMATION (Q3). The backend sends no separate flag, so the text decides.
+const PROVISIONAL_NOTE = /\bPROVISIONAL\b|PENDING PORT CONFIRMATION/;
+const badgeSource = (source: string | undefined, content: string) =>
+  source === 'template' && PROVISIONAL_NOTE.test(content) ? 'provisional' : source;
 
 function SourceBadge({ source }: { source?: string }) {
   const badge = source ? SOURCE_BADGES[source] : undefined;
@@ -123,7 +131,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
           <time dateTime={new Date(message.timestamp).toISOString()}>{formatTime(message.timestamp)}</time>
         </div>
 
-        <SourceBadge source={message.metadata?.sqlSource} />
+        <SourceBadge source={badgeSource(message.metadata?.sqlSource, message.content)} />
 
         {/* Markdown content */}
         <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed query-answer">

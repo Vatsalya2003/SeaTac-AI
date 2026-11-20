@@ -1,28 +1,39 @@
 /*
- * SeaTac AI design system: SEA airport colours, type and the app's components, in plain CSS.
+ * SeaTac AI design system: green palette, type and the app's components, in plain CSS.
  * index.css is a pre-built Tailwind file: utility classes that aren't already in it have no effect,
  * so new styles go here instead of new Tailwind classes. Loaded after index.css (src/main.tsx).
  */
 
 /* ---- tokens --------------------------------------------------------------------------------------------- */
 :root {
-  /* palette: Seattle-Tacoma International Airport (SEA) brand colours, from the airport logo */
-  --sea-ink: #1a2229;          /* logo charcoal: text, 16.1:1 on white */
-  --sea-ink-muted: #5b6670;    /* secondary text, 5.9:1 on white */
-  --sea-accent: #4bca00;       /* SEA green: filled buttons and marks, always with dark text (7.5:1); */
-                               /* white on it is only 2.1:1, so never white text on green */
-  --sea-accent-hover: #3eb300; /* filled hover, dark text 5.9:1 */
-  --sea-accent-strong: #2e7d0f;/* readable green on white (5.2:1): focus rings, green text, input focus */
-  --sea-accent-tint: #eef8e8;  /* light green: question bubble, verified badge, chip hover */
-  --sea-mist: #dde3e0;         /* borders and dividers */
-  --sea-mist-light: #f4f6f5;   /* neutral surfaces: sidebar */
-  --sea-warn-light: #fff6e5;   /* calm warm tint for the "not yet verified" badge */
-  --sea-warn-border: #ecd3a0;
-  --sea-field-border: #7c8790; /* input outlines: 3.7:1 on white (WCAG non-text contrast) */
+  /* palette: SeaTac AI greens (all text pairs 4.5:1 or more; checked values next to each one) */
+  --green-900: #1b5e20;        /* primary accent: buttons, send, New chat, links, active chat, focus; white text 7.9:1 */
+  --green-500: #66bb6a;        /* chart series 1, active-chat marker, small icons; never white text on it */
+  --green-300: #a5d6a7;        /* selected/hover borders on white, Verified badge border, chart series 2 */
+  --green-50: #e8f5e9;         /* sidebar and panels, user bubbles, chips, highlighted table row */
+
+  --sea-ink: #1f2421;          /* text: 15.8:1 on white, 14.0:1 on green-50 */
+  --sea-ink-muted: #5b655d;    /* secondary text: 6.1:1 on white, 5.4:1 on green-50 */
   --sea-surface: #ffffff;      /* page background */
-  --sea-card: #ffffff;         /* tables and cards inside answers */
-  --sea-on-accent: #1a2229;    /* text and icons on SEA green, in both themes */
-  --sea-danger: #a23b3b;       /* error text, 6.5:1 on white */
+  --sea-card: #ffffff;         /* answer card, tables, charts */
+  --sea-mist: #e3e8e4;         /* dividers */
+  --sea-mist-light: var(--green-50);
+  --sea-accent: var(--green-900);
+  --sea-accent-hover: #154a19; /* white text 10.4:1 */
+  --sea-accent-strong: var(--green-900); /* green text and focus rings: 7.9:1 on white, 7.0:1 on green-50 */
+  --sea-accent-tint: var(--green-50);
+  --sea-accent-mark: var(--green-500);
+  --sea-accent-border: var(--green-300);
+  --sea-on-accent: #ffffff;
+  --sea-hover-on-tint: var(--green-900); /* hover border on green-50 surfaces (7.0:1; green-300 there is only 1.5:1) */
+  --sea-field-border: #7a857c; /* input outlines: 3.8:1 on white */
+
+  /* answer source badges */
+  --badge-verified-text: var(--green-900);  --badge-verified-bg: var(--green-50); --badge-verified-border: var(--green-300); /* 7.0:1 */
+  --badge-provisional-text: #8a5a00; --badge-provisional-bg: #fff4e0; --badge-provisional-border: #f0d9a8;              /* 5.4:1 */
+  --badge-ai-text: #5b655d; --badge-ai-bg: #f2f3f2; --badge-ai-border: #d9ddda;                                        /* 5.5:1 */
+
+  --sea-danger: #a23b3b;       /* error text: 6.5:1 on white */
   --sea-danger-light: #fbf1f1;
 
   /* type */
@@ -36,9 +47,9 @@
   --sea-radius: 12px;
   --sea-radius-sm: 8px;
   --sea-radius-pill: 999px;
-  --sea-shadow: 0 1px 2px rgba(26, 34, 41, 0.06), 0 4px 16px rgba(26, 34, 41, 0.06);
+  --sea-shadow: 0 1px 2px rgba(31, 36, 33, 0.06), 0 4px 16px rgba(31, 36, 33, 0.06);
   --sea-column: 760px;
-  --sea-focus: 0 0 0 3px rgba(46, 125, 15, 0.3);
+  --sea-focus: 0 0 0 3px rgba(27, 94, 32, 0.25);
 }
 
 /* ---- base ----------------------------------------------------------------------------------------------- */
@@ -126,7 +137,7 @@ html, body {
 .sea-login-brand { text-align: center; margin-bottom: 28px; }
 .sea-logo {
   display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin-bottom: 14px;
-  border-radius: 12px; background: var(--sea-accent); color: #fff;
+  border-radius: 12px; background: var(--sea-accent); color: var(--sea-on-accent);
 }
 .sea-logo svg { width: 22px; height: 22px; }
 .sea-login-brand h1 { margin: 0; font-size: 22px; font-weight: 600; line-height: 1.3; color: var(--sea-ink); }
@@ -158,12 +169,12 @@ html, body {
 }
 .sea-chip {
   display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 52px;
-  padding: 10px 14px; border: 1px solid var(--sea-mist); border-radius: var(--sea-radius);
-  background: var(--sea-surface); color: var(--sea-ink); font: inherit; font-size: 14px; line-height: 1.35; text-align: left;
+  padding: 10px 14px; border: 1px solid var(--sea-accent-tint); border-radius: var(--sea-radius);
+  background: var(--sea-accent-tint); color: var(--sea-ink); font: inherit; font-size: 14px; line-height: 1.35; text-align: left;
   cursor: pointer; transition: background-color 0.15s, border-color 0.15s;
 }
 .sea-chip svg { width: 16px; height: 16px; flex-shrink: 0; color: var(--sea-ink-muted); transition: color 0.15s; }
-.sea-chip:hover:not(:disabled) { background: var(--sea-accent-tint); border-color: var(--sea-accent); }
+.sea-chip:hover:not(:disabled) { background: var(--sea-surface); border-color: var(--sea-hover-on-tint); }
 .sea-chip:hover:not(:disabled) svg { color: var(--sea-accent-strong); }
 .sea-chip:disabled { cursor: not-allowed; opacity: 0.55; }
 @media (max-width: 480px) { .sea-welcome { padding: 32px 16px 16px; } .sea-welcome h2 { font-size: 22px; } }
@@ -202,9 +213,11 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
   background: transparent; color: var(--sea-ink); font: inherit; font-size: 14px; line-height: 1.4; text-align: left;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer;
 }
-.sea-chat-item:hover { background: rgba(255, 255, 255, 0.7); }
+.sea-chat-item { border: 1px solid transparent; }
+.sea-chat-item:hover { background: var(--sea-surface); border-color: var(--sea-hover-on-tint); }
 .sea-chat.is-active .sea-chat-item {
-  background: var(--sea-surface); font-weight: 500; box-shadow: inset 3px 0 0 var(--sea-accent), 0 1px 2px rgba(26, 34, 41, 0.06);
+  background: var(--sea-surface); color: var(--sea-accent-strong); font-weight: 600; border-color: var(--sea-accent-border);
+  box-shadow: inset 3px 0 0 var(--sea-accent-mark);
 }
 .sea-chat-delete {
   position: absolute; top: 50%; right: 4px; width: 30px; height: 30px; transform: translateY(-50%); opacity: 0;
@@ -220,7 +233,8 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-resize::after {
   content: ""; position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; background: transparent; transition: background-color 0.15s;
 }
-.sea-resize:hover::after, .sea-resize:focus-visible::after, body.sea-resizing .sea-resize::after { background: var(--sea-accent-strong); }
+.sea-resize:hover::after, body.sea-resizing .sea-resize::after { background: var(--sea-accent-mark); }
+.sea-resize:focus-visible::after { background: var(--sea-accent-strong); }
 .sea-app .sea-resize:focus-visible { outline: none; }
 
 .sea-mobile-only { display: none; }
@@ -257,10 +271,13 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
   background: var(--sea-accent-tint); color: var(--sea-ink); white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .sea-msg-assistant {
-  /* answer content is unchanged; the toggle buttons inside use SEA green (with dark text) instead of near-black */
+  /* answer content is unchanged; the active toggle button inside uses green-900 with white text instead of near-black */
   --primary: var(--sea-accent);
   --primary-foreground: var(--sea-on-accent);
   position: relative;
+  /* answer card: white, with a green-900 accent line on the left */
+  padding: 16px 16px 12px 18px; background: var(--sea-card);
+  border: 1px solid var(--sea-mist); border-left: 3px solid var(--sea-accent); border-radius: var(--sea-radius);
 }
 .sea-msg-meta { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .sea-msg-author { font-size: 14px; font-weight: 600; color: var(--sea-ink); }
@@ -277,14 +294,15 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 .sea-msg-assistant .rounded-lg.border { max-width: 100%; overflow-x: auto; }
 
 /* answer source badges, in the palette */
-.sea-msg-assistant .answer-badge--verified { border-color: #bfe6a8; background: var(--sea-accent-tint); color: var(--sea-accent-strong); }
-.sea-msg-assistant .answer-badge--ai { border-color: var(--sea-warn-border); background: var(--sea-warn-light); color: var(--sea-ink); }
+.sea-msg-assistant .answer-badge--verified { border-color: var(--badge-verified-border); background: var(--badge-verified-bg); color: var(--badge-verified-text); }
+.sea-msg-assistant .answer-badge--provisional { border-color: var(--badge-provisional-border); background: var(--badge-provisional-bg); color: var(--badge-provisional-text); }
+.sea-msg-assistant .answer-badge--ai { border-color: var(--badge-ai-border); background: var(--badge-ai-bg); color: var(--badge-ai-text); }
 
 /* loading */
 .sea-loading { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--sea-ink-muted); }
 .sea-dots { display: inline-flex; gap: 4px; }
 .sea-dots i {
-  width: 7px; height: 7px; border-radius: 50%; background: var(--sea-accent); opacity: 0.35;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--sea-accent-mark); opacity: 0.35;
   animation: sea-pulse 1.2s ease-in-out infinite;
 }
 .sea-dots i:nth-child(2) { animation-delay: 0.15s; }
@@ -315,7 +333,7 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 }
 .sea-send svg { width: 18px; height: 18px; }
 .sea-send:hover:not(:disabled) { background: var(--sea-accent-hover); }
-.sea-send:disabled { background: var(--sea-mist); color: var(--sea-ink-muted); cursor: not-allowed; }
+.sea-send:disabled { background: var(--sea-mist); color: var(--sea-ink-muted); cursor: not-allowed; } /* 4.9:1 */
 .sea-composer-hint { max-width: var(--sea-column); margin: 6px auto 0; text-align: center; font-size: var(--sea-text-xs); color: var(--sea-ink-muted); }
 
 @media (max-width: 767px) {
@@ -323,9 +341,9 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
   .sea-composer { padding: 8px 12px 12px; }
   .sea-composer-hint { display: none; }
 }
-/* slightly tighter cells so a five-column table fits the 760 px reading column */
-.sea-msg-assistant .query-data-table th { padding: 12px 14px; }
-.sea-msg-assistant .query-data-table td { padding: 10px 14px; }
+/* slightly tighter cells so a five-column table fits inside the answer card in the 760 px column */
+.sea-msg-assistant .query-data-table th { padding: 12px 10px; }
+.sea-msg-assistant .query-data-table td { padding: 10px 10px; }
 
 /* ---- small screens and touch ---------------------------------------------------------------------------- */
 .sea-composer { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
@@ -343,36 +361,39 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 
 /* ==== dark mode ============================================================================================
    Turned on by data-theme="dark" on <html> (src/theme.tsx; index.html applies it before the first paint).
-   Same SEA green; text on green stays dark. Contrast on the page: text 14.7:1, muted 7.8:1, green text 9.9:1, input borders 3.6:1. */
+   green-500 buttons with dark text; green-300 for green text and focus. Contrast on the page: text 14.7:1, muted 7.8:1, green text 9.9:1, input borders 3.6:1. */
 :root[data-theme="dark"] {
-  --sea-ink: #e6ebee;
-  --sea-ink-muted: #a3adb5;
-  --sea-accent: #4bca00;
-  --sea-accent-hover: #5fd61a;
-  --sea-accent-strong: #74d93a;  /* readable green on dark surfaces */
-  --sea-accent-tint: #1d2e17;
+  --sea-ink: #e6ebee;            /* 14.8:1 on the page, 13.6:1 on cards */
+  --sea-ink-muted: #a3adb5;      /* 7.8:1 on the page */
+  --sea-accent: var(--green-500);   /* buttons: dark text on green-500 (6.7:1), never white */
+  --sea-accent-hover: #81c784;      /* dark text 7.8:1 */
+  --sea-accent-strong: var(--green-300); /* green text and focus rings: 10.8:1 on the page, 9.9:1 on cards */
+  --sea-accent-tint: #1b2b1d;
+  --sea-accent-mark: var(--green-500);
+  --sea-accent-border: #2e5a32;
+  --sea-on-accent: #1f2421;
+  --sea-hover-on-tint: var(--green-300);
   --sea-mist: #2c363e;
-  --sea-mist-light: #0d1216;     /* sidebar, a step darker than the page */
-  --sea-warn-light: #2e2716;
-  --sea-warn-border: #6e5a2c;
-  --sea-field-border: #66727c;
+  --sea-mist-light: #0f1712;     /* sidebar */
+  --sea-field-border: #66727c;   /* 3.6:1 on the page */
   --sea-surface: #13191e;
   --sea-card: #192127;
+  --badge-verified-text: var(--green-300); --badge-verified-bg: #1b2b1d; --badge-verified-border: #2e5a32;  /* 9.1:1 */
+  --badge-provisional-text: #f0c27a; --badge-provisional-bg: #2e2716; --badge-provisional-border: #6e5a2c; /* 9.0:1 */
+  --badge-ai-text: #b4bdb6; --badge-ai-bg: #232a26; --badge-ai-border: #38423b;                            /* 7.6:1 */
   --sea-danger: #f19a9a;
   --sea-danger-light: #2e1a1a;
   --sea-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
-  --sea-focus: 0 0 0 3px rgba(116, 217, 58, 0.35);
+  --sea-focus: 0 0 0 3px rgba(165, 214, 167, 0.3);
 }
 :root[data-theme="dark"] .sea-login-card { background: var(--sea-card); }
 :root[data-theme="dark"] .sea-login { background: var(--sea-mist-light); }
 :root[data-theme="dark"] .sea-input,
-:root[data-theme="dark"] .sea-chip,
 :root[data-theme="dark"] .sea-composer-box { background: var(--sea-card); }
 :root[data-theme="dark"] .sea-composer-box[aria-busy="true"] { background: var(--sea-surface); }
-:root[data-theme="dark"] .sea-chat-item:hover { background: rgba(255, 255, 255, 0.05); }
+:root[data-theme="dark"] .sea-chat-item:hover { background: var(--sea-card); }
 :root[data-theme="dark"] .sea-chat.is-active .sea-chat-item { background: var(--sea-card); }
 :root[data-theme="dark"] .sea-form-alert { border-color: #5c2b2b; border-left-color: var(--sea-danger); }
-:root[data-theme="dark"] .sea-msg-assistant .answer-badge--verified { border-color: #355a24; }
 :root[data-theme="dark"] .sea-send:disabled { background: var(--sea-mist); color: var(--sea-ink-muted); }
 
 /* answer content in dark mode: the shared table CSS (query-results.css) and the Tailwind grey classes
@@ -406,4 +427,15 @@ body.sea-resizing { cursor: col-resize; user-select: none; }
 :root[data-theme="dark"] .sea-app .text-gray-400 { color: var(--sea-ink-muted); }
 
 /* charts are drawn on a canvas with dark labels, so they keep a light card in dark mode (exports stay white) */
-:root[data-theme="dark"] .sea-app .sea-chart-surface { background-color: #f4f6f5; }
+:root[data-theme="dark"] .sea-app .sea-chart-surface { background-color: #ffffff; }
+
+/* ---- green palette details ---------------------------------------------------------------------------- */
+.sea-new-chat { background: var(--sea-accent); color: var(--sea-on-accent); border-color: transparent; font-weight: 600; }
+.sea-new-chat:hover:not(:disabled) { background: var(--sea-accent-hover); }
+.sea-app a { color: var(--sea-accent-strong); }
+.sea-chat-item:focus-visible, .sea-chip:focus-visible { outline-color: var(--sea-accent-strong); } /* 7.0:1 on green-50 */
+.sea-msg-assistant .query-answer, .sea-msg-assistant .query-answer strong { color: var(--sea-ink); }
+@media (max-width: 767px) { .sea-msg-assistant { padding: 14px 14px 10px; } }
+/* data-table search box: centre its magnifier icon (its Tailwind centring classes aren't in the pre-built CSS) */
+.sea-msg-assistant .relative > svg.absolute.left-3 { position: absolute; top: 50%; left: 12px; transform: translateY(-50%); pointer-events: none; }
+.sea-msg-assistant .relative > svg.absolute.left-3 ~ input { padding-left: 36px; }

@@ -1,9 +1,14 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { Chart as ChartJS, registerables } from 'chart.js';
+
+// SeaTac AI chart colours: series in this order, then repeat; light gridlines
+const SERIES_COLORS = ['#1B5E20', '#66BB6A', '#A5D6A7', '#9AA39C'];
+const GRIDLINE_COLOR = '#E3E8E4';
 import { Button } from './ui/button';
 import { Download, Image as ImageIcon, FileText, Check, BarChart3, LineChart, PieChart } from 'lucide-react';
 
 ChartJS.register(...registerables);
+ChartJS.defaults.borderColor = GRIDLINE_COLOR;  // gridlines and axis lines
 
 interface ChartVisualizationProps {
   chartConfig: {
@@ -64,31 +69,27 @@ export default function ChartVisualization({ chartConfig, insightsText }: ChartV
     const ctx = canvasRef.current.getContext('2d');
     if (!ctx) return;
 
-    // Prepare data based on chart type
-    let chartData = { ...displayData };
+    // Prepare data based on chart type (series colours: SERIES_COLORS in order)
+    let chartData: typeof displayData = {
+      ...displayData,
+      datasets: displayData.datasets.map((dataset, i) => ({
+        ...dataset,
+        backgroundColor: SERIES_COLORS[i % SERIES_COLORS.length],
+        borderColor: SERIES_COLORS[i % SERIES_COLORS.length],
+      })),
+    };
     let chartOptions = { ...chartConfig.options };
 
     // For pie charts, use multiple colors
     if (chartType === 'pie') {
-      const colors = [
-        'rgba(59, 130, 246, 0.7)',   // Blue
-        'rgba(16, 185, 129, 0.7)',   // Green
-        'rgba(245, 158, 11, 0.7)',   // Amber
-        'rgba(239, 68, 68, 0.7)',    // Red
-        'rgba(139, 92, 246, 0.7)',   // Purple
-        'rgba(236, 72, 153, 0.7)',   // Pink
-        'rgba(20, 184, 166, 0.7)',   // Teal
-        'rgba(251, 146, 60, 0.7)',   // Orange
-        'rgba(14, 165, 233, 0.7)',   // Sky
-        'rgba(168, 85, 247, 0.7)',   // Violet
-      ];
+      const colors = SERIES_COLORS;
 
       chartData = {
         ...displayData,
         datasets: displayData.datasets.map(dataset => ({
           ...dataset,
           backgroundColor: displayData.labels.map((_, index) => colors[index % colors.length]),
-          borderColor: displayData.labels.map((_, index) => colors[index % colors.length].replace('0.7', '1')),
+          borderColor: '#FFFFFF',  // white edges keep neighbouring slices apart
           borderWidth: 2
         }))
       };
