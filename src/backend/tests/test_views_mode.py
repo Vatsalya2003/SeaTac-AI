@@ -196,7 +196,7 @@ def test_peak_hours_note(answers):
 
 
 def test_taxiway_proxy_marked_provisional(answers):
-    assert "PROVISIONAL" in answers["Q7"]["answer"]
+    assert "Provisional:" in answers["Q7"]["answer"] and "awaiting Port confirmation." in answers["Q7"]["answer"]
 
 
 # ---- filters, aliases, empty results ------------------------------------------------------------------------

@@ -362,3 +362,10 @@ def test_answer_source_for_every_mode(app):
         assert src({"success": True, "sql_source": legacy_or_views}) == "ai_sql"
     for failed in ("template", "ai_sql", "error", "rejected", "none"):
         assert src({"success": False, "sql_source": failed}) == "none"
+
+
+def test_provisional_notes_wording(ans):
+    for q in ("Q2", "Q3", "Q7"):
+        text = ans(q)["answer"]
+        assert "_Note: Provisional: " in text and "awaiting Port confirmation." in text, f"{q} provisional note"
+        assert "PENDING PORT CONFIRMATION" not in text and "PROVISIONAL" not in text, f"{q} old wording"

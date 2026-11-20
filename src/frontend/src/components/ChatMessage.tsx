@@ -49,9 +49,10 @@ const SOURCE_BADGES: Record<string, { label: string; className: string; Icon: ty
             className: 'answer-badge--ai' },
 };
 
-// A tested answer whose rule the Port hasn't confirmed yet: its notes say PROVISIONAL (Q7) or
-// PENDING PORT CONFIRMATION (Q3). The backend sends no separate flag, so the text decides.
-const PROVISIONAL_NOTE = /\bPROVISIONAL\b|PENDING PORT CONFIRMATION/;
+// A tested answer whose rule the Port hasn't confirmed yet: a note reads "Provisional: …; awaiting Port
+// confirmation." (Q2, Q3, Q7; older saved chats say PROVISIONAL or PENDING PORT CONFIRMATION).
+// The backend sends no separate flag, so the text decides.
+const PROVISIONAL_NOTE = /\bProvisional:|\bPROVISIONAL\b|PENDING PORT CONFIRMATION/;
 const badgeSource = (source: string | undefined, content: string) =>
   source === 'template' && PROVISIONAL_NOTE.test(content) ? 'provisional' : source;
 

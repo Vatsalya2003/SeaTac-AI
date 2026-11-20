@@ -340,7 +340,8 @@ def _q2(res, run, day):
     if empty:
         head += f" No data (no departures): {', '.join(empty)}."
     notes = ["Hours are the local hour the aircraft left parking (off-block), not the take-off hour.",
-             "PENDING PORT CONFIRMATION: off-block time is Aerobahn's Actual Off Block Time (the team's working assumption)."]
+             "Provisional: off-block time is Aerobahn's Actual Off Block Time (the team's working assumption); "
+             "awaiting Port confirmation."]
     chart = _chart("line", "Average taxi-out time by hour of off-block", [hour_label(r["off_block_hour"]) for r in rows],
                    [("Average taxi-out (min)", [r["avg_taxi_out_min"] for r in rows])], "Minutes")
     return {"headline": head, "tables": [_table(rows, ["off_block_hour", "avg_taxi_out_min", "flights"],
@@ -366,8 +367,8 @@ def _q3(res, run, day):
     data = [{"local_hour": r["local_hour"], "max_aircraft_in_area": r["max_aircraft_in_area"]} for r in rows]
     notes = ["This is the highest number of aircraft present at the same moment, not the number of aircraft "
              "that passed through during the hour.",
-             "PENDING PORT CONFIRMATION: the hatched movement-area boundary is mapped to the export's Movement Area "
-             "Entrance/Exit times (working assumption)."]
+             "Provisional: the hatched movement-area boundary is mapped to the export's Movement Area "
+             "Entrance/Exit times (working assumption); awaiting Port confirmation."]
     chart = _chart("bar", "Peak aircraft in the movement area, by hour",
                    [hour_label(r["local_hour"]) for r in rows], [("Aircraft at once", [r["max_aircraft_in_area"] for r in rows])],
                    "Aircraft")
@@ -457,8 +458,8 @@ def _q7(res, run, day):
     notes = ["Each flight is counted once per section, even if it used that section more than once.",
              "Tango (T), Hotel (H) and Whiskey (W) do not appear in this data: the export only records the section used "
              "to enter or exit the runway and the ramp, not the full taxi route.",
-             "PROVISIONAL: the export has no per-section entry time, so the reporting day is selected by a proxy time "
-             "(runway or movement-area entry/exit), pending Port confirmation. The missed approach is not included."]
+             "Provisional: the export has no per-section entry time, so the reporting day is selected by a proxy time "
+             "(runway or movement-area entry/exit); awaiting Port confirmation. The missed approach is not included."]
     chart = _chart("bar", "Flights per taxiway section (top 15)", [r["taxiway_section"] for r in seg[:15]],
                    [("Flights", [r["flights"] for r in seg[:15]])], "Flights")
     tables = [_table(twy, ["taxiway_name", "taxiway_letter", "flights"], ["Taxiway", "Letter", "Flights"]),
